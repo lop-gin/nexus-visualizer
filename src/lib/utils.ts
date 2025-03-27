@@ -1,34 +1,42 @@
 
-import { ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
+/**
+ * Combines Tailwind CSS classes with clsx and tailwind-merge
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Add type coercion functions
-export function asString(value: any, defaultValue: string = ''): string {
-  if (value === null || value === undefined) return defaultValue;
-  return String(value);
+/**
+ * Check if a string is a valid UUID
+ */
+export function isValidId(id: string | undefined): boolean {
+  if (!id) return false;
+  
+  // Basic UUID validation regex
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
 }
 
-export function asNumber(value: any, defaultValue: number = 0): number {
-  if (value === null || value === undefined) return defaultValue;
-  const num = Number(value);
-  return isNaN(num) ? defaultValue : num;
+/**
+ * Format a date string to a readable format
+ */
+export function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return 'N/A';
+  
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
-export function asEnum<T extends string>(value: any, validValues: T[], defaultValue: T): T {
-  if (value === null || value === undefined) return defaultValue;
-  return validValues.includes(value as T) ? (value as T) : defaultValue;
-}
-
-// Helper for handling null/undefined in string parameters
-export function ensureString(value: string | null | undefined): string {
-  return value ?? '';
-}
-
-// Type guard for employee status
-export function isValidStatus(status: string): status is 'active' | 'inactive' | 'invited' {
-  return ['active', 'inactive', 'invited'].includes(status);
+/**
+ * Truncate a string to a specified length
+ */
+export function truncateText(text: string, maxLength: number = 50): string {
+  if (text.length <= maxLength) return text;
+  return `${text.substring(0, maxLength)}...`;
 }

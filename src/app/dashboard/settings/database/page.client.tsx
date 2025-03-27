@@ -1,63 +1,53 @@
 
-'use client';
-
 import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/common/layout/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { executeSQLMigration, checkDatabaseStatus } from '@/lib/supabase/migrations';
+import { executeSQLMigration, MigrationResult } from '@/lib/supabase/migrations';
 import toast from 'react-hot-toast';
+import { useCompany } from '@/providers/company-provider';
 
-export default function DatabaseSettingsPage() {
-  const [sqlQuery, setSqlQuery] = useState('');
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [dbStatus, setDbStatus] = useState({ success: true, message: 'Checking database status...' });
-  const [queryResult, setQueryResult] = useState<any>(null);
-
-  // Check database status on component mount
-  React.useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const status = await checkDatabaseStatus();
-        setDbStatus(status);
-      } catch (error) {
-        setDbStatus({ success: false, message: 'Failed to check database status' });
-      }
-    };
-
-    checkStatus();
-  }, []);
+export default function DatabasePage() {
+  const { isAdmin } = useCompany();
+  const [sql, setSql] = useState('');
+  const [executing, setExecuting] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string }>({
+    success: false,
+    message: ''
+  });
 
   const handleExecuteSQL = async () => {
-    if (!sqlQuery.trim()) {
-      toast.error('Please enter a SQL query to execute');
+    if (!sql.trim()) {
+      toast.error('Please enter SQL to execute');
       return;
     }
 
-    setIsExecuting(true);
-    setQueryResult(null);
-    
+    setExecuting(true);
     try {
-      const result = await executeSQLMigration(sqlQuery);
+      const res = await executeSQLMigration(sql);
       
-      if (result.success) {
+      setResult({
+        success: res.success,
+        message: res.message || (res.error ? res.error : res.success ? 'SQL executed successfully' : 'Failed to execute SQL')
+      });
+
+      if (res.success) {
         toast.success('SQL executed successfully');
-        setQueryResult({ success: true, message: 'Query executed successfully' });
       } else {
-        toast.error(result.error || 'Failed to execute SQL');
-        setQueryResult({ success: false, error: result.error });
+        toast.error(res.error || 'Failed to execute SQL');
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to execute SQL');
-      setQueryResult({ success: false, error: error.message });
+      console.error('Error executing SQL:', error);
+      setResult({
+        success: false,
+        message: error.message || 'An error occurred while executing the SQL'
+      });
+      toast.error(error.message || 'An error occurred while executing the SQL');
     } finally {
-      setIsExecuting(false);
+      setExecuting(false);
     }
-  };
-
-  const handleSqlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSqlQuery(e.target.value);
   };
 
   return (
@@ -66,46 +56,53 @@ export default function DatabaseSettingsPage() {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-semibold text-gray-800">Database Management</h1>
         </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Database Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`p-4 rounded-md ${dbStatus.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-              {dbStatus.message}
-            </div>
-          </CardContent>
-        </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Execute SQL</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea 
-              label="SQL Query"
-              rows={10}
-              value={sqlQuery}
-              onChange={handleSqlChange}
-              placeholder="Enter SQL query to execute..."
-            />
-            
-            <Button 
-              onClick={handleExecuteSQL}
-              disabled={isExecuting}
-              className="w-full"
-            >
-              {isExecuting ? 'Executing...' : 'Execute SQL'}
-            </Button>
-            
-            {queryResult && (
-              <div className={`p-4 rounded-md mt-4 ${queryResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-                {queryResult.success 
-                  ? queryResult.message 
-                  : `Error: ${queryResult.error}`}
+          <CardContent>
+            <div className="space-y-4">
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <p className="text-sm text-yellow-700">
+                  <strong>Warning:</strong> Executing raw SQL can be dangerous. 
+                  Make sure you know what you are doing, as this can permanently 
+                  alter your database.
+                </p>
               </div>
-            )}
+
+              <Textarea
+                label="SQL Statement"
+                value={sql}
+                onChange={e => setSql(e.target.value)}
+                rows={10}
+                placeholder="Enter SQL statement to execute..."
+                className="font-mono"
+                disabled={!isAdmin}
+              />
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleExecuteSQL}
+                  disabled={executing || !sql.trim() || !isAdmin}
+                  isLoading={executing}
+                  loadingText="Executing..."
+                >
+                  Execute SQL
+                </Button>
+              </div>
+
+              {result.message && (
+                <div className={`mt-4 p-4 border rounded ${result.success ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+                  <h3 className={`font-medium ${result.success ? 'text-green-700' : 'text-red-700'}`}>
+                    {result.success ? 'Success' : 'Error'}
+                  </h3>
+                  <p className="mt-1 text-sm whitespace-pre-wrap">
+                    {result.message}
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

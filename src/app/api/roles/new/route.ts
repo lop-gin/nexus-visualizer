@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, description, permissions } = body;
     
-    const newRole = await createRole(name, description, permissions);
+    const newRole = await createRole(name, description, permissions || []);
     
     return NextResponse.json(newRole, { status: 201 });
   } catch (error: any) {

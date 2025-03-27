@@ -34,12 +34,12 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const updates = {
-      name: body.name,
-      description: body.description,
-    };
+    const roleId = params.id;
     
-    const updatedRole = await updateRole(params.id, updates);
+    const updatedRole = await updateRole(roleId, {
+      name: body.name,
+      description: body.description
+    });
     
     return NextResponse.json(updatedRole);
   } catch (error: any) {

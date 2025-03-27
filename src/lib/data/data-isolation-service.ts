@@ -1,169 +1,164 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/types/supabase';
-import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabase/client';
+import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
-// Service to handle data access with company isolation
-export const useDataIsolationService = () => {
-  const supabase = createClientComponentClient<Database>();
-  
-  // Function to ensure company context is set before any data operation
-  const ensureCompanyContext = async () => {
-    try {
-      // Get current user session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No active session');
-      }
-      
-      // Get user's company
-      const { data: employee, error } = await supabase
-        .from('employees')
-        .select('company_id')
-        .eq('user_id', session.user.id)
-        .single();
-      
-      if (error || !employee) {
-        throw new Error('Failed to get company information');
-      }
-      
-      // Set company context for RLS policies
-      await supabase.rpc('set_app_variables', {
-        p_user_id: session.user.id,
-        p_company_id: employee.company_id
-      });
-      
-      return employee.company_id;
-    } catch (error) {
-      console.error('Error ensuring company context:', error);
-      throw error;
-    }
-  };
-  
-  // Generic function to fetch data with company isolation
-  const fetchIsolatedData = async <T,>(
-    tableName: string,
-    select: string = '*',
-    additionalQuery?: (query: any) => any
-  ): Promise<T[]> => {
-    try {
-      await ensureCompanyContext();
-      
-      let query = supabase
-        .from(tableName)
-        .select(select);
-      
-      // Apply additional query parameters if provided
-      if (additionalQuery) {
-        query = additionalQuery(query);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        throw error;
-      }
-      
-      return data as T[];
-    } catch (error) {
-      console.error(`Error fetching ${tableName}:`, error);
-      toast.error(`Failed to load ${tableName}`);
-      return [];
-    }
-  };
-  
-  // Generic function to insert data with company isolation
-  const insertIsolatedData = async <T,>(
-    tableName: string,
-    data: any
-  ): Promise<T | null> => {
-    try {
-      const companyId = await ensureCompanyContext();
-      
-      // Add company_id to the data if not already present
-      const dataWithCompany = {
-        ...data,
-        company_id: data.company_id || companyId
-      };
-      
-      const { data: result, error } = await supabase
-        .from(tableName)
-        .insert([dataWithCompany])
-        .select()
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      return result as T;
-    } catch (error) {
-      console.error(`Error inserting into ${tableName}:`, error);
-      toast.error(`Failed to create ${tableName.slice(0, -1)}`);
-      return null;
-    }
-  };
-  
-  // Generic function to update data with company isolation
-  const updateIsolatedData = async <T,>(
-    tableName: string,
-    id: string,
-    data: any
-  ): Promise<T | null> => {
-    try {
-      await ensureCompanyContext();
-      
-      const { data: result, error } = await supabase
-        .from(tableName)
-        .update(data)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      return result as T;
-    } catch (error) {
-      console.error(`Error updating ${tableName}:`, error);
-      toast.error(`Failed to update ${tableName.slice(0, -1)}`);
-      return null;
-    }
-  };
-  
-  // Generic function to delete data with company isolation
-  const deleteIsolatedData = async (
-    tableName: string,
-    id: string
-  ): Promise<boolean> => {
-    try {
-      await ensureCompanyContext();
-      
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error(`Error deleting from ${tableName}:`, error);
-      toast.error(`Failed to delete ${tableName.slice(0, -1)}`);
-      return false;
-    }
-  };
-  
-  return {
-    ensureCompanyContext,
-    fetchIsolatedData,
-    insertIsolatedData,
-    updateIsolatedData,
-    deleteIsolatedData
-  };
-};
+// Type for allowed table names to eliminate the "string is not assignable to never" errors
+type AllowedTable = 
+  | 'companies' 
+  | 'roles' 
+  | 'modules' 
+  | 'permissions' 
+  | 'employees' 
+  | 'invitations' 
+  | 'products' 
+  | 'transactions' 
+  | 'transaction_items' 
+  | 'customers'
+  | 'categories';
 
-export default useDataIsolationService;
+/**
+ * Set app variables for data isolation (company context and user context)
+ */
+export async function setIsolationContext(userId: string, companyId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.rpc('set_app_variables', {
+      p_user_id: userId,
+      p_company_id: companyId
+    });
+
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Error setting isolation context:', error);
+    return false;
+  }
+}
+
+/**
+ * Fetch data from a table with pagination, filtering, and sorting
+ */
+export async function fetchTableData<T>(
+  table: AllowedTable,
+  options: {
+    page?: number;
+    limit?: number;
+    filterColumn?: string;
+    filterValue?: string;
+    sortColumn?: string;
+    sortOrder?: 'asc' | 'desc';
+    selectFields?: string;
+  } = {}
+): Promise<{
+  data: T[];
+  count: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> {
+  try {
+    let query: PostgrestFilterBuilder<any, any, any> = supabase
+      .from(table)
+      .select(options.selectFields || '*', { count: 'exact' });
+
+    // Apply filters
+    if (options.filterColumn && options.filterValue) {
+      query = query.ilike(options.filterColumn, `%${options.filterValue}%`);
+    }
+
+    // Apply sorting
+    if (options.sortColumn) {
+      query = query.order(options.sortColumn, { ascending: options.sortOrder === 'asc' });
+    }
+
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit - 1;
+
+    query = query.range(startIndex, endIndex);
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    const totalCount = count || 0;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      data: data || [],
+      count: totalCount,
+      page,
+      limit,
+      totalPages,
+    };
+  } catch (error) {
+    console.error('Error fetching table data:', error);
+    return {
+      data: [],
+      count: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 0,
+    };
+  }
+}
+
+/**
+ * Insert data into a table
+ */
+export async function insertTableData<T>(table: AllowedTable, data: T): Promise<T | null> {
+  try {
+    const { data: insertedData, error } = await supabase
+      .from(table)
+      .insert([data])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return insertedData;
+  } catch (error) {
+    console.error('Error inserting table data:', error);
+    return null;
+  }
+}
+
+/**
+ * Update data in a table
+ */
+export async function updateTableData<T>(table: AllowedTable, id: string, updates: Partial<T>, idColumn: string = 'id'): Promise<T | null> {
+  try {
+    const { data: updatedData, error } = await supabase
+      .from(table)
+      .update(updates)
+      .eq(idColumn, id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return updatedData;
+  } catch (error) {
+    console.error('Error updating table data:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete data from a table
+ */
+export async function deleteTableData(table: AllowedTable, id: string, idColumn: string = 'id'): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq(idColumn, id);
+
+    if (error) throw error;
+
+    return true;
+  } catch (error) {
+    console.error('Error deleting table data:', error);
+    return false;
+  }
+}

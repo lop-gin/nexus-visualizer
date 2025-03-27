@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase/client';
 import { Role, Permission } from '@/types/auth';
 import { ensureString } from '@/lib/utils';
@@ -312,3 +311,45 @@ export const deleteRole = async (roleId: string): Promise<void> => {
     throw error;
   }
 };
+
+/**
+ * Update a role permission for a specific module and action
+ */
+export async function updateRolePermission(
+  roleId: string,
+  moduleId: string,
+  action: 'view' | 'create' | 'edit' | 'delete',
+  value: boolean
+): Promise<boolean> {
+  try {
+    // Determine which field to update based on the action
+    let updateField: string;
+    switch(action) {
+      case 'view':
+        updateField = 'can_view';
+        break;
+      case 'create':
+        updateField = 'can_create';
+        break;
+      case 'edit':
+        updateField = 'can_edit';
+        break;
+      case 'delete':
+        updateField = 'can_delete';
+        break;
+    }
+
+    // Update the permission
+    const { error } = await supabase
+      .from('permissions')
+      .update({ [updateField]: value })
+      .match({ role_id: roleId, module_id: moduleId });
+
+    if (error) throw error;
+
+    return true;
+  } catch (error) {
+    console.error('Error updating role permission:', error);
+    return false;
+  }
+}

@@ -1,22 +1,23 @@
-'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import CustomerDropdown from './customer-dropdown';
 import { Customer } from '@/types/sales';
-import CustomerDropdown from '@/components/forms/customer/customer-dropdown';
 
 interface CustomerFormFieldsProps {
   customerId: string;
-  onCustomerChange: (customerId: string, customerData?: Customer) => void;
+  onCustomerChange: (id: string, customerData?: Customer) => void;
   email: string;
-  onEmailChange: (email: string) => void;
+  onEmailChange: (value: string) => void;
   company: string;
-  onCompanyChange: (company: string) => void;
+  onCompanyChange: (value: string) => void;
   billingAddress: string;
-  onBillingAddressChange: (address: string) => void;
+  onBillingAddressChange: (value: string) => void;
   disabled?: boolean;
 }
 
-export const CustomerFormFields: React.FC<CustomerFormFieldsProps> = ({
+const CustomerFormFields: React.FC<CustomerFormFieldsProps> = ({
   customerId,
   onCustomerChange,
   email,
@@ -25,78 +26,51 @@ export const CustomerFormFields: React.FC<CustomerFormFieldsProps> = ({
   onCompanyChange,
   billingAddress,
   onBillingAddressChange,
-  disabled = false,
+  disabled = false
 }) => {
-  // Handle customer selection and auto-populate fields
-  const handleCustomerChange = (id: string, customerData?: Customer) => {
+  
+  const handleCustomerSelected = (id: string, customerData?: Customer) => {
     onCustomerChange(id, customerData);
     
-    // Auto-populate fields if customer data is available
     if (customerData) {
-      if (customerData.email) {
-        onEmailChange(customerData.email);
-      }
-      
-      if (customerData.company) {
-        onCompanyChange(customerData.company);
-      }
-      
-      if (customerData.billing_address) {
-        onBillingAddressChange(customerData.billing_address);
-      }
+      onEmailChange(customerData.email || '');
+      onCompanyChange(customerData.company || '');
+      onBillingAddressChange(customerData.billing_address || '');
     }
   };
   
   return (
     <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Customer
-        </label>
-        <CustomerDropdown
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CustomerDropdown 
           value={customerId}
-          onChange={handleCustomerChange}
-          required
+          onChange={handleCustomerSelected}
           disabled={disabled}
         />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Email
-        </label>
-        <input
+        
+        <Input
           type="email"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          label="Email"
           value={email}
           onChange={(e) => onEmailChange(e.target.value)}
           disabled={disabled}
         />
       </div>
       
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Company
-        </label>
-        <input
-          type="text"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Company"
           value={company}
           onChange={(e) => onCompanyChange(e.target.value)}
           disabled={disabled}
         />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Billing Address
-        </label>
-        <textarea
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={3}
+        
+        <Textarea
+          label="Billing Address"
           value={billingAddress}
           onChange={(e) => onBillingAddressChange(e.target.value)}
           disabled={disabled}
+          rows={3}
         />
       </div>
     </div>

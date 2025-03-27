@@ -1,4 +1,7 @@
 
+/**
+ * Product model
+ */
 export interface Product {
   id: number;
   name: string;
@@ -6,31 +9,32 @@ export interface Product {
   primary_unit_of_measure: string;
   secondary_unit_of_measure: string | null;
   conversion_factor: number | null;
-  category?: string | null;
-  default_unit_price?: number | null;
-  default_tax_percent?: number | null;
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string;
-  updated_by?: string;
+  category?: string | Category;
+  default_unit_price?: number;
+  default_tax_percent?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
 }
 
+/**
+ * Category model
+ */
 export interface Category {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string;
-  updated_by?: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
 }
 
+/**
+ * Product unit type
+ */
 export interface ProductUnit {
-  unit_type: string;
+  unit_type: 'primary' | 'secondary';
   unit_name: string;
-}
-
-// Convert string to number where needed
-export function parseProductId(id: string | number): number {
-  return typeof id === 'string' ? parseInt(id, 10) : id;
 }
