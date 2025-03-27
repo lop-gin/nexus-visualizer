@@ -1,100 +1,94 @@
-import { supabase } from '@/lib/supabase/client';
+
+import { supabase } from '../supabase/client';
 import { Customer } from '@/types/sales';
 
-/**
- * Create a new customer
- */
-export async function createCustomer(customerData: Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'updated_by'>): Promise<Customer | null> {
+export const fetchCustomerById = async (id: string): Promise<Customer | null> => {
   try {
-    // Format the data to ensure null values are not sent as undefined
-    const formattedData = {
-      name: customerData.name,
-      email: customerData.email || null,
-      phone: customerData.phone || null,
-      address: customerData.address || null,
-      company: customerData.company || null,
-      billing_address: customerData.billing_address || null
-    };
-
     const { data, error } = await supabase
       .from('customers')
-      .insert(formattedData)
-      .select()
+      .select('*')
+      .eq('id', id)
       .single();
 
-    if (error) throw error;
-    
+    if (error) {
+      console.error('Error fetching customer:', error);
+      throw error;
+    }
+
     return data;
   } catch (error) {
-    console.error('Error creating customer:', error);
+    console.error('Error in fetchCustomerById:', error);
     return null;
   }
-}
+};
 
-/**
- * Fetch all customers
- */
-export async function fetchCustomers(): Promise<Customer[]> {
+export const fetchCustomers = async (): Promise<Customer[]> => {
   try {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
       .order('name');
 
-    if (error) throw error;
-    
+    if (error) {
+      console.error('Error fetching customers:', error);
+      throw error;
+    }
+
     return data || [];
   } catch (error) {
-    console.error('Error fetching customers:', error);
+    console.error('Error in fetchCustomers:', error);
     return [];
   }
-}
+};
 
-/**
- * Fetch a customer by ID
- */
-export async function fetchCustomerById(id: string): Promise<Customer | null> {
+export const createCustomer = async (customer: Omit<Customer, 'id' | 'created_at' | 'updated_at'>): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
   try {
     const { data, error } = await supabase
       .from('customers')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    
-    return data;
-  } catch (error) {
-    console.error('Error fetching customer:', error);
-    return null;
-  }
-}
-
-/**
- * Update an existing customer
- */
-export async function updateCustomer(id: string, updates: Partial<Customer>): Promise<Customer | null> {
-  try {
-    const { data, error } = await supabase
-      .from('customers')
-      .update(updates)
-      .eq('id', id)
+      .insert(customer)
       .select()
       .single();
 
     if (error) throw error;
-    
-    return data;
-  } catch (error) {
-    console.error('Error updating customer:', error);
-    return null;
-  }
-}
 
-/**
- * Delete a customer by ID
- */
-export async function deleteCustomer(id: string): Promise<boolean> {
+    return { success: true, customer: data };
+  } catch (error: any) {
+    console.error('Error creating customer:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to create customer' 
+    };
+  }
+};
+
+export const updateCustomer = async (id: string, customer: Partial<Customer>): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Prepare the update object to ensure proper types
+    const customerToUpdate = {
+      ...customer,
+      // Ensure created_at isn't null
+      created_at: customer.created_at || undefined,
+      updated_at: new Date().toISOString()
+    };
+    
+    const { error } = await supabase
+      .from('customers')
+      .update(customerToUpdate)
+      .eq('id', id);
+
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating customer:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to update customer' 
+    };
+  }
+};
+
+export const deleteCustomer = async (id: string): Promise<{ success: boolean; error?: string }> => {
   try {
     const { error } = await supabase
       .from('customers')
@@ -102,10 +96,13 @@ export async function deleteCustomer(id: string): Promise<boolean> {
       .eq('id', id);
 
     if (error) throw error;
-    
-    return true;
-  } catch (error) {
+
+    return { success: true };
+  } catch (error: any) {
     console.error('Error deleting customer:', error);
-    return false;
+    return { 
+      success: false, 
+      error: error.message || 'Failed to delete customer' 
+    };
   }
-}
+};

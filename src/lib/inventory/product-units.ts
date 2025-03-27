@@ -1,84 +1,106 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/types/supabase';
-import { Product } from '@/types/inventory';
+import { supabase } from '../supabase/client';
 
-// Function to get product units for dropdown
-export const getProductUnits = async (productId: string) => {
-  const supabase = createClientComponentClient<Database>();
-  
+export interface ProductUnit {
+  unit_type: string;
+  unit_name: string;
+}
+
+export const fetchProductUnits = async (productId: string): Promise<ProductUnit[]> => {
   try {
     const { data, error } = await supabase
-      .rpc('get_product_units', { product_id: parseInt(productId) });
-    
+      .rpc('get_product_units', { product_id: productId })
+      .select();
+
     if (error) {
+      console.error('Error fetching product units:', error);
       throw error;
     }
-    
+
     return data || [];
   } catch (error) {
-    console.error('Error fetching product units:', error);
+    console.error('Error in fetchProductUnits:', error);
     return [];
   }
 };
 
-// Function to get product details including units
-export const getProductDetails = async (productId: string): Promise<Product | null> => {
-  const supabase = createClientComponentClient<Database>();
-  
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('id', productId)
-      .single();
-    
-    if (error) {
-      throw error;
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error fetching product details:', error);
-    return null;
-  }
-};
-
-// Function to convert between units
-export const convertBetweenUnits = (
-  quantity: number, 
-  fromUnitType: 'primary' | 'secondary', 
-  toUnitType: 'primary' | 'secondary', 
-  conversionFactor: number
-): number => {
-  if (fromUnitType === toUnitType) {
+export const convertUnitQuantity = async (
+  productId: string,
+  fromUnit: string,
+  toUnit: string,
+  quantity: number
+): Promise<number> => {
+  // If converting between the same unit, return the quantity
+  if (fromUnit === toUnit) {
     return quantity;
   }
-  
-  if (fromUnitType === 'primary' && toUnitType === 'secondary') {
-    return quantity / conversionFactor;
+
+  try {
+    // Fetch product details to get conversion factor
+    const { data: product, error } = await supabase
+      .from('products')
+      .select('conversion_factor, primary_unit_of_measure, secondary_unit_of_measure')
+      .eq('id', productId)
+      .single();
+
+    if (error || !product) {
+      console.error('Error fetching product for unit conversion:', error);
+      throw error || new Error('Product not found');
+    }
+
+    const { conversion_factor, primary_unit_of_measure, secondary_unit_of_measure } = product;
+
+    // If conversion factor is not defined, return the original quantity
+    if (!conversion_factor) {
+      return quantity;
+    }
+
+    // Convert from primary to secondary
+    if (fromUnit === primary_unit_of_measure && toUnit === secondary_unit_of_measure) {
+      return quantity / conversion_factor;
+    }
+
+    // Convert from secondary to primary
+    if (fromUnit === secondary_unit_of_measure && toUnit === primary_unit_of_measure) {
+      return quantity * conversion_factor;
+    }
+
+    // If units don't match product units, return original quantity
+    return quantity;
+  } catch (error) {
+    console.error('Error in convertUnitQuantity:', error);
+    return quantity;
   }
-  
-  if (fromUnitType === 'secondary' && toUnitType === 'primary') {
-    return quantity * conversionFactor;
-  }
-  
-  return quantity;
 };
 
-// Function to format unit display
-export const formatUnitDisplay = (unitName: string, quantity: number): string => {
-  return `${quantity} ${unitName}${quantity !== 1 ? 's' : ''}`;
-};
+export const calculateUnitPrice = async (
+  productId: string,
+  unit: string,
+  basePrice: number
+): Promise<number> => {
+  try {
+    // Fetch product details to determine unit type
+    const { data: product, error } = await supabase
+      .from('products')
+      .select('primary_unit_of_measure, secondary_unit_of_measure, conversion_factor')
+      .eq('id', productId)
+      .single();
 
-// Function to get unit price based on selected unit
-export const getUnitPrice = (
-  defaultUnitPrice: number,
-  selectedUnitType: 'primary' | 'secondary',
-  conversionFactor: number
-): number => {
-  if (selectedUnitType === 'primary') {
-    return defaultUnitPrice;
-  } else {
-    return defaultUnitPrice * conversionFactor;
+    if (error || !product) {
+      console.error('Error fetching product for price calculation:', error);
+      throw error || new Error('Product not found');
+    }
+
+    const { primary_unit_of_measure, secondary_unit_of_measure, conversion_factor } = product;
+
+    // If the selected unit is the secondary unit, adjust price
+    if (unit === secondary_unit_of_measure && conversion_factor) {
+      return basePrice * conversion_factor;
+    }
+
+    // Otherwise, return the base price (for primary unit)
+    return basePrice;
+  } catch (error) {
+    console.error('Error in calculateUnitPrice:', error);
+    return basePrice;
   }
 };

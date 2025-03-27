@@ -1,58 +1,47 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createRoles, createModules } from '@/lib/supabase/migrations';
+import { executeSQLMigration } from '@/lib/supabase/migrations';
 
-/**
- * API route for initializing and migrating Supabase database.
- * This should only be used in development and managed deployments.
- */
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    // Check if API key is provided as a query parameter for security
-    const { searchParams } = new URL(request.url);
-    const apiKey = searchParams.get('apiKey');
+    const { sql } = await request.json();
     
-    if (!apiKey || apiKey !== process.env.MIGRATION_API_KEY) {
+    if (!sql) {
       return NextResponse.json(
-        { success: false, message: 'Invalid API key' },
-        { status: 401 }
+        { error: 'SQL query is required' },
+        { status: 400 }
       );
     }
+
+    const result = await executeSQLMigration(sql);
     
-    // Perform migrations
-    const results = [];
-    
-    // Create roles table and insert predefined roles
-    try {
-      const rolesResult = await createRoles();
-      results.push({ operation: 'createRoles', success: true });
-    } catch (error: any) {
-      console.error('Error creating roles:', error);
-      results.push({ 
-        operation: 'createRoles', 
-        success: false,
-        message: error.message 
-      });
-    }
-    
-    // Create modules table and insert default modules
-    try {
-      const modulesResult = await createModules();
-      results.push({ operation: 'createModules', success: true });
-    } catch (error: any) {
-      console.error('Error creating modules:', error);
-      results.push({ 
-        operation: 'createModules', 
-        success: false, 
-        message: error.message 
-      });
-    }
-    
-    return NextResponse.json({ success: true, results });
+    return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Error running migrations:', error);
+    console.error('Error executing SQL migration:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Failed to run migrations' },
+      { error: error.message || 'Failed to execute SQL migration' },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper function to initialize the database
+export async function GET() {
+  try {
+    // Initialize the database with predefined data
+    const result = {
+      success: true,
+      message: 'Migration functions still need to be implemented',
+      details: [
+        'createRoles and createModules need to be implemented'
+      ]
+    };
+    
+    return NextResponse.json(result);
+  } catch (error: any) {
+    console.error('Error initializing database:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to initialize database' },
       { status: 500 }
     );
   }

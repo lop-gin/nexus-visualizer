@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getEmployeeById, updateEmployee, deleteEmployee } from '@/lib/supabase/employees-service';
+import { fetchEmployeeById, updateEmployeeStatus } from '@/lib/supabase/employees-service';
 
 // Get employee by ID
 export async function GET(
@@ -8,24 +8,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = params.id;
-    
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Employee ID is required' },
-        { status: 400 }
-      );
-    }
-    
-    const employee = await getEmployeeById(id);
-    
+    const employee = await fetchEmployeeById(params.id);
     if (!employee) {
       return NextResponse.json(
         { error: 'Employee not found' },
         { status: 404 }
       );
     }
-    
     return NextResponse.json(employee);
   } catch (error: any) {
     console.error('Error fetching employee:', error);
@@ -36,56 +25,36 @@ export async function GET(
   }
 }
 
-// Update employee
-export async function PUT(
+// Update employee status
+export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = params.id;
-    
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Employee ID is required' },
-        { status: 400 }
-      );
-    }
-    
     const body = await request.json();
-    const updatedEmployee = await updateEmployee(id, body);
-    
-    return NextResponse.json(updatedEmployee);
-  } catch (error: any) {
-    console.error('Error updating employee:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to update employee' },
-      { status: 500 }
-    );
-  }
-}
+    const { status } = body;
 
-// Delete employee
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const id = params.id;
-    
-    if (!id) {
+    if (!status) {
       return NextResponse.json(
-        { error: 'Employee ID is required' },
+        { error: 'Status is required' },
         { status: 400 }
       );
     }
+
+    const result = await updateEmployeeStatus(params.id, status);
     
-    await deleteEmployee(id);
-    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error || 'Failed to update employee status' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Error deleting employee:', error);
+    console.error('Error updating employee status:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to delete employee' },
+      { error: error.message || 'Failed to update employee status' },
       { status: 500 }
     );
   }

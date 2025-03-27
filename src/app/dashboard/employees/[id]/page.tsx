@@ -1,12 +1,8 @@
 
-import { Metadata } from 'next';
-import EmployeeEditPage from './page.client';
+import React from 'react';
+import EmployeeDetailsClient from './page.client';
+import { withCompanyContext } from '@/lib/auth/with-company-context';
 
-export const metadata: Metadata = {
-  title: 'Edit Employee',
-  description: 'Edit employee information',
-};
-
-export default function Page({ params }: { params: { id: string } }) {
-  return <EmployeeEditPage id={params.id} />;
+export default async function EmployeeDetailsPage({ params }: { params: { id: string } }) {
+  return withCompanyContext(props => <EmployeeDetailsClient {...props} params={params} />);
 }

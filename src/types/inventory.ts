@@ -1,40 +1,32 @@
 
-/**
- * Product model
- */
 export interface Product {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
+  sku: string | null;
+  barcode: string | null;
+  price: number;
+  cost: number | null;
+  tax_rate: number | null;
   primary_unit_of_measure: string;
   secondary_unit_of_measure: string | null;
   conversion_factor: number | null;
-  category?: string | Category;
-  default_unit_price?: number;
-  default_tax_percent?: number;
-  created_at?: string | null;
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
+  min_stock_level: number | null;
+  max_stock_level: number | null;
+  reorder_point: number | null;
+  is_active: boolean;
+  category_id: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  category?: Category | null;
 }
 
-/**
- * Category model
- */
 export interface Category {
   id: string;
   name: string;
   description: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-}
-
-/**
- * Product unit type
- */
-export interface ProductUnit {
-  unit_type: 'primary' | 'secondary';
-  unit_name: string;
+  created_at?: string;
+  updated_at?: string;
 }

@@ -1,150 +1,165 @@
 
-import React, { useState } from 'react';
+'use client';
+
+import React, { useState, useCallback, ChangeEvent } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Customer } from '@/types/sales';
-import { createCustomer } from '@/lib/sales/customer-service';
+import { FormTextarea } from '@/components/ui/form-textarea';
 import toast from 'react-hot-toast';
+import { createCustomer } from '@/lib/sales/customer-service';
+import { Customer } from '@/types/sales';
 
 interface AddCustomerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
   onCustomerAdded: (customer: Customer) => void;
-  trigger?: React.ReactNode;
 }
 
-const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ 
-  onCustomerAdded,
-  trigger
-}) => {
-  const [open, setOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'updated_by'>>({
+export const AddCustomerModal = ({ isOpen, onClose, onCustomerAdded }: AddCustomerModalProps) => {
+  const [formState, setFormState] = useState({
     name: '',
     email: '',
     phone: '',
     address: '',
     company: '',
-    billing_address: ''
+    billing_address: '',
+    shipping_notes: ''
   });
-  
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name.trim()) {
+    setFormState(prev => ({ ...prev, [name]: value }));
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!formState.name) {
       toast.error('Customer name is required');
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
-      const newCustomer = await createCustomer(formData);
-      
-      if (newCustomer) {
+      const result = await createCustomer({
+        name: formState.name,
+        email: formState.email || null,
+        phone: formState.phone || null,
+        address: formState.address || null,
+        company: formState.company || null,
+        billing_address: formState.billing_address || null,
+        shipping_notes: formState.shipping_notes || null
+      });
+
+      if (result.success && result.customer) {
         toast.success('Customer added successfully');
-        onCustomerAdded(newCustomer);
-        setFormData({
+        onCustomerAdded(result.customer);
+        onClose();
+        setFormState({
           name: '',
           email: '',
           phone: '',
           address: '',
           company: '',
-          billing_address: ''
+          billing_address: '',
+          shipping_notes: ''
         });
-        setOpen(false);
       } else {
-        throw new Error('Failed to add customer');
+        toast.error(result.error || 'Failed to add customer');
       }
     } catch (error: any) {
-      toast.error(error.message || 'An error occurred while adding the customer');
+      console.error('Error adding customer:', error);
+      toast.error('Error adding customer: ' + (error.message || 'Unknown error'));
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || <Button variant="outline">Add New Customer</Button>}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add New Customer</DialogTitle>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <Input
-            label="Name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-          
-          <Input
-            type="email"
-            label="Email"
-            name="email"
-            value={formData.email || ''}
-            onChange={handleChange}
-          />
-          
-          <Input
-            label="Phone"
-            name="phone"
-            value={formData.phone || ''}
-            onChange={handleChange}
-          />
-          
-          <Input
-            label="Company"
-            name="company"
-            value={formData.company || ''}
-            onChange={handleChange}
-          />
-          
-          <Textarea
-            label="Address"
-            name="address"
-            value={formData.address || ''}
-            onChange={handleChange}
-            rows={3}
-          />
-          
-          <Textarea
-            label="Billing Address"
-            name="billing_address"
-            value={formData.billing_address || ''}
-            onChange={handleChange}
-            rows={3}
-          />
-          
-          <div className="flex justify-end space-x-2 pt-2">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setOpen(false)}
+
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <label htmlFor="name" className="text-sm font-medium text-gray-700">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <Input
+              id="name"
+              name="name"
+              value={formState.name}
+              onChange={handleInputChange}
+              placeholder="Enter customer name"
               disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              isLoading={isSubmitting}
-              loadingText="Adding..."
-            >
-              Add Customer
-            </Button>
+            />
           </div>
-        </form>
+
+          <div className="grid gap-2">
+            <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              value={formState.email}
+              onChange={handleInputChange}
+              placeholder="Enter email address"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label htmlFor="phone" className="text-sm font-medium text-gray-700">Phone</label>
+            <Input
+              id="phone"
+              name="phone"
+              value={formState.phone}
+              onChange={handleInputChange}
+              placeholder="Enter phone number"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label htmlFor="company" className="text-sm font-medium text-gray-700">Company</label>
+            <Input
+              id="company"
+              name="company"
+              value={formState.company}
+              onChange={handleInputChange}
+              placeholder="Enter company name"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <FormTextarea
+            name="address"
+            label="Address"
+            value={formState.address}
+            onChange={handleInputChange}
+            rows={3}
+          />
+
+          <FormTextarea
+            name="billing_address"
+            label="Billing Address"
+            value={formState.billing_address}
+            onChange={handleInputChange}
+            rows={3}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Adding...' : 'Add Customer'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
-
-export default AddCustomerModal;

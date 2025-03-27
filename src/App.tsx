@@ -36,10 +36,14 @@ function App() {
               
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/dashboard/employees" element={<EmployeesPage />} />
-              <Route path="/dashboard/employees/:id" element={<EmployeeDetailsPage />} />
+              <Route path="/dashboard/employees/:id" element={
+                <EmployeeDetailsPage params={{ id: ':id' }} />
+              } />
               <Route path="/dashboard/employees/add" element={<AddEmployeePage />} />
               <Route path="/dashboard/roles" element={<RolesPage />} />
-              <Route path="/dashboard/roles/:id" element={<RoleDetailsPage />} />
+              <Route path="/dashboard/roles/:id" element={
+                <RoleDetailsPage params={{ id: ':id' }} />
+              } />
               <Route path="/dashboard/roles/new" element={<NewRolePage />} />
               <Route path="/dashboard/products" element={<ProductsPage />} />
               <Route path="/dashboard/settings/database" element={<DatabaseSettingsPage />} />

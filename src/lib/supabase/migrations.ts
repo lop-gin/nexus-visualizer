@@ -1,103 +1,89 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/types/supabase';
 
-/**
- * Execute SQL migration script
- */
-export async function executeSQLMigration(sqlScript: string) {
-  const supabase = createClientComponentClient<Database>();
-  
+import { supabase } from './client';
+
+export interface MigrationResult {
+  success: boolean;
+  results: any[];
+  error?: string;
+  message?: string;
+}
+
+export const executeSQLMigration = async (sql: string): Promise<MigrationResult> => {
   try {
-    // Split the script into individual statements
-    const statements = sqlScript
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0);
+    const { data, error } = await supabase.rpc('exec_sql', { sql_query: sql });
     
-    let results = [];
-    
-    // Execute each statement
-    for (const statement of statements) {
-      const { data, error } = await supabase.rpc('execute_sql', {
-        sql_query: statement + ';'
-      });
-      
-      if (error) throw error;
-      
-      results.push(data);
+    if (error) {
+      console.error("SQL migration error:", error);
+      return {
+        success: false,
+        results: [],
+        error: error.message,
+        message: `Error executing migration: ${error.message}`
+      };
     }
     
     return {
       success: true,
-      results
+      results: data || [],
+      message: 'Migration executed successfully'
     };
-  } catch (error) {
-    console.error('Error executing SQL migration:', error);
-    throw error;
+  } catch (error: any) {
+    console.error("SQL migration execution error:", error);
+    return {
+      success: false,
+      results: [],
+      error: error.message,
+      message: `Error executing migration: ${error.message}`
+    };
   }
-}
+};
 
-/**
- * Create a new company and admin account
- */
-export async function createCompanyAndAdmin(
-  userId: string,
-  companyName: string,
-  companyType: 'manufacturer' | 'distributor' | 'both',
-  fullName: string,
-  email: string
-) {
-  const supabase = createClientComponentClient<Database>();
-  
+export const createRoles = async (): Promise<MigrationResult> => {
   try {
-    // Start a transaction
-    // Create company
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .insert({
-        name: companyName,
-        type: companyType,
-        email: email
-      })
-      .select('id')
-      .single();
-      
-    if (companyError) throw companyError;
-    if (!company) throw new Error('Failed to create company');
+    const { data, error } = await supabase.rpc('insert_predefined_roles');
     
-    // Get admin role ID
-    const { data: adminRole, error: roleError } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'Admin')
-      .single();
-      
-    if (roleError) throw roleError;
-    if (!adminRole) throw new Error('Admin role not found');
-    
-    // Create employee record for the admin
-    const { data: employee, error: employeeError } = await supabase
-      .from('employees')
-      .insert({
-        user_id: userId,
-        company_id: company.id,
-        full_name: fullName,
-        email: email,
-        is_admin: true,
-        role_id: adminRole.id,
-        status: 'active'
-      })
-      .select()
-      .single();
-      
-    if (employeeError) throw employeeError;
+    if (error) {
+      return {
+        success: false,
+        results: [],
+        error: error.message,
+        message: `Error creating roles: ${error.message}`
+      };
+    }
     
     return {
-      company,
-      employee
+      success: true,
+      results: [data],
+      message: 'Roles created successfully'
     };
-  } catch (error) {
-    console.error('Error creating company and admin:', error);
-    throw error;
+  } catch (error: any) {
+    return {
+      success: false,
+      results: [],
+      error: error.message,
+      message: `Error creating roles: ${error.message}`
+    };
   }
-}
+};
+
+export const createModules = async (): Promise<MigrationResult> => {
+  const modulesSQL = `
+    INSERT INTO modules (name, display_name, description)
+    VALUES 
+      ('dashboard', 'Dashboard', 'System dashboard and overview'),
+      ('employees', 'Employees', 'Employee management'),
+      ('roles', 'Roles', 'Role and permission management'),
+      ('customers', 'Customers', 'Customer management'),
+      ('products', 'Products', 'Product management'),
+      ('sales', 'Sales', 'Sales management'),
+      ('invoices', 'Invoices', 'Invoice management'),
+      ('estimates', 'Estimates', 'Estimate management'),
+      ('settings', 'Settings', 'System settings')
+    ON CONFLICT (name) DO UPDATE SET 
+      display_name = EXCLUDED.display_name,
+      description = EXCLUDED.description
+    RETURNING *;
+  `;
+  
+  return executeSQLMigration(modulesSQL);
+};
