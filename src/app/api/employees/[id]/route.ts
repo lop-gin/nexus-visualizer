@@ -1,14 +1,23 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchEmployeeById, updateEmployee, deleteEmployee, sendEmployeeInvitation } from '@/lib/supabase/employees-service';
+import { getEmployeeById, updateEmployee, deleteEmployee } from '@/lib/supabase/employees-service';
 
-// API route to get a specific employee by ID
+// Get employee by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const employee = await fetchEmployeeById(params.id);
+    const id = params.id;
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Employee ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    const employee = await getEmployeeById(id);
     
     if (!employee) {
       return NextResponse.json(
@@ -18,37 +27,32 @@ export async function GET(
     }
     
     return NextResponse.json(employee);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching employee:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch employee' },
+      { error: error.message || 'Failed to fetch employee' },
       { status: 500 }
     );
   }
 }
 
-// API route to update an employee
+// Update employee
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await request.json();
-    const { full_name, email, phone, role_id, is_admin, send_invite } = body;
+    const id = params.id;
     
-    const updatedEmployee = await updateEmployee(
-      params.id,
-      full_name,
-      email,
-      phone,
-      role_id,
-      is_admin
-    );
-    
-    // Send invitation if requested
-    if (send_invite) {
-      await sendEmployeeInvitation(params.id);
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Employee ID is required' },
+        { status: 400 }
+      );
     }
+    
+    const body = await request.json();
+    const updatedEmployee = await updateEmployee(id, body);
     
     return NextResponse.json(updatedEmployee);
   } catch (error: any) {
@@ -60,13 +64,22 @@ export async function PUT(
   }
 }
 
-// API route to delete an employee
+// Delete employee
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    await deleteEmployee(params.id);
+    const id = params.id;
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Employee ID is required' },
+        { status: 400 }
+      );
+    }
+    
+    await deleteEmployee(id);
     
     return NextResponse.json({ success: true });
   } catch (error: any) {

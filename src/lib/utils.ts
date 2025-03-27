@@ -40,3 +40,17 @@ export function truncateText(text: string, maxLength: number = 50): string {
   if (text.length <= maxLength) return text;
   return `${text.substring(0, maxLength)}...`;
 }
+
+/**
+ * Ensures that the input value is always a string, even if it's undefined
+ */
+export function ensureString(value: string | undefined): string {
+  return value || '';
+}
+
+/**
+ * Validates if the status is one of the allowed values
+ */
+export function isValidStatus(status: string): status is 'active' | 'inactive' | 'invited' {
+  return ['active', 'inactive', 'invited'].includes(status);
+}

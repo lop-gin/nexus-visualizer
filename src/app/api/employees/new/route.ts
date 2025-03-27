@@ -1,41 +1,41 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createEmployee, sendEmployeeInvitation } from '@/lib/supabase/employees-service';
-import { employeeSchema } from '@/types/auth';
 
+// Create a new employee
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const { email, full_name, role_id, company_id, is_admin } = body;
     
-    // Validate employee data
-    const employeeData = employeeSchema.parse({
-      full_name: body.full_name,
-      email: body.email,
-      phone: body.phone || null,
-      address: body.address || null,
-      role_id: body.role_id,
-      is_admin: body.is_admin || false,
-      status: 'invited',
-      // We need to get company_id from current user
-      company_id: 'company_id_here', // Replace with actual company ID
-    });
-    
-    // Create employee in database
-    const newEmployee = await createEmployee(employeeData, body.send_invite || false);
-    
-    // Send invitation if requested
-    if (body.send_invite) {
-      if (newEmployee.id) {
-        await sendEmployeeInvitation(newEmployee.id);
-      }
+    // Validate required fields
+    if (!email || !full_name) {
+      return NextResponse.json(
+        { error: 'Email and full name are required' },
+        { status: 400 }
+      );
     }
     
-    return NextResponse.json({ success: true, employee: newEmployee });
+    // Create the employee record
+    const newEmployee = await createEmployee({
+      email,
+      full_name,
+      role_id,
+      company_id,
+      is_admin: is_admin || false,
+      status: 'invited',
+      invitation_sent: false
+    });
+    
+    // Send invitation email (in a real app)
+    await sendEmployeeInvitation(email, full_name, role_id, company_id, is_admin || false);
+    
+    return NextResponse.json(newEmployee, { status: 201 });
   } catch (error: any) {
     console.error('Error creating employee:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to create employee' },
-      { status: 400 }
+      { error: error.message || 'Failed to create employee' },
+      { status: 500 }
     );
   }
 }

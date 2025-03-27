@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 
 export type Column<T> = {
   header: string;
@@ -8,67 +8,61 @@ export type Column<T> = {
   className?: string;
 };
 
-interface DataTableProps<T> {
+export interface DataTableProps<T> {
   data: T[];
   columns: Column<T>[];
   loading?: boolean;
+  emptyMessage?: string;
   onRowClick?: (row: T) => void;
-  emptyStateMessage?: string;
 }
 
 export function DataTable<T>({
   data,
   columns,
   loading = false,
+  emptyMessage = 'No data available.',
   onRowClick,
-  emptyStateMessage = "No data available"
 }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="w-full flex justify-center p-6">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   if (data.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-        <p>{emptyStateMessage}</p>
-      </div>
-    );
+    return <div className="text-center py-4 text-gray-500">{emptyMessage}</div>;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((column, idx) => (
-              <TableHead key={idx} className={column.className}>
-                {column.header}
-              </TableHead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {columns.map((column, i) => (
+            <TableHead key={i} className={column.className}>
+              {column.header}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {data.map((row, rowIndex) => (
+          <TableRow 
+            key={rowIndex}
+            onClick={() => onRowClick && onRowClick(row)}
+            className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+          >
+            {columns.map((column, colIndex) => (
+              <TableCell key={colIndex} className={column.className}>
+                {typeof column.accessor === 'function'
+                  ? column.accessor(row)
+                  : row[column.accessor] as React.ReactNode}
+              </TableCell>
             ))}
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((row, rowIdx) => (
-            <TableRow 
-              key={rowIdx}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={onRowClick ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800" : ""}
-            >
-              {columns.map((col, colIdx) => (
-                <TableCell key={colIdx} className={col.className}>
-                  {typeof col.accessor === 'function'
-                    ? col.accessor(row)
-                    : row[col.accessor] as React.ReactNode}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

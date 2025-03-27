@@ -1,164 +1,207 @@
-import { supabase } from '@/lib/supabase/client';
-import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 
-// Type for allowed table names to eliminate the "string is not assignable to never" errors
-type AllowedTable = 
-  | 'companies' 
-  | 'roles' 
-  | 'modules' 
-  | 'permissions' 
-  | 'employees' 
-  | 'invitations' 
-  | 'products' 
-  | 'transactions' 
-  | 'transaction_items' 
-  | 'customers'
-  | 'categories';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/supabase';
 
-/**
- * Set app variables for data isolation (company context and user context)
- */
-export async function setIsolationContext(userId: string, companyId: string): Promise<boolean> {
-  try {
-    const { error } = await supabase.rpc('set_app_variables', {
-      p_user_id: userId,
-      p_company_id: companyId
-    });
-
-    if (error) throw error;
-    
-    return true;
-  } catch (error) {
-    console.error('Error setting isolation context:', error);
-    return false;
-  }
-}
+// Define types for tables allowed in our service
+export type AllowedTable = 
+  | 'companies'
+  | 'employees'
+  | 'roles'
+  | 'invitations'
+  | 'modules'
+  | 'permissions'
+  | 'products'
+  | 'categories'
+  | 'transactions'
+  | 'transaction_items'
+  | 'customers';
 
 /**
- * Fetch data from a table with pagination, filtering, and sorting
+ * Generic service for CRUD operations with proper company isolation
  */
-export async function fetchTableData<T>(
-  table: AllowedTable,
-  options: {
-    page?: number;
-    limit?: number;
-    filterColumn?: string;
-    filterValue?: string;
-    sortColumn?: string;
-    sortOrder?: 'asc' | 'desc';
-    selectFields?: string;
-  } = {}
-): Promise<{
-  data: T[];
-  count: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}> {
-  try {
-    let query: PostgrestFilterBuilder<any, any, any> = supabase
-      .from(table)
-      .select(options.selectFields || '*', { count: 'exact' });
-
-    // Apply filters
-    if (options.filterColumn && options.filterValue) {
-      query = query.ilike(options.filterColumn, `%${options.filterValue}%`);
+export class DataIsolationService {
+  private supabase = createClientComponentClient<Database>();
+  
+  /**
+   * Create a new record in a table with company_id from the current user
+   */
+  async create<T extends Record<string, any>>(
+    table: AllowedTable,
+    data: Omit<T, 'company_id' | 'created_at' | 'updated_at'>
+  ): Promise<T> {
+    try {
+      // Get the current user's company
+      const { data: { session } } = await this.supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      
+      // Get the user's company
+      const { data: employee, error: employeeError } = await this.supabase
+        .from('employees')
+        .select('company_id')
+        .eq('user_id', session.user.id)
+        .single();
+        
+      if (employeeError) throw employeeError;
+      if (!employee) throw new Error('No company found for user');
+      
+      // Insert data with company_id
+      const insertData = {
+        ...data,
+        company_id: employee.company_id
+      };
+      
+      const { data: newRecord, error } = await this.supabase
+        .from(table)
+        .insert(insertData as any)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      if (!newRecord) throw new Error(`Failed to create record in ${table}`);
+      
+      return newRecord as T;
+    } catch (error) {
+      console.error(`Error creating record in ${table}:`, error);
+      throw error;
     }
-
-    // Apply sorting
-    if (options.sortColumn) {
-      query = query.order(options.sortColumn, { ascending: options.sortOrder === 'asc' });
+  }
+  
+  /**
+   * Fetch a single record by ID
+   */
+  async getById<T>(
+    table: AllowedTable,
+    id: string
+  ): Promise<T | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from(table)
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+        
+      if (error) throw error;
+      return data as T | null;
+    } catch (error) {
+      console.error(`Error fetching record from ${table}:`, error);
+      throw error;
     }
-
-    const page = options.page || 1;
-    const limit = options.limit || 10;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit - 1;
-
-    query = query.range(startIndex, endIndex);
-
-    const { data, error, count } = await query;
-
-    if (error) throw error;
-
-    const totalCount = count || 0;
-    const totalPages = Math.ceil(totalCount / limit);
-
-    return {
-      data: data || [],
-      count: totalCount,
-      page,
-      limit,
-      totalPages,
-    };
-  } catch (error) {
-    console.error('Error fetching table data:', error);
-    return {
-      data: [],
-      count: 0,
-      page: 1,
-      limit: 10,
-      totalPages: 0,
-    };
+  }
+  
+  /**
+   * Update a record by ID
+   */
+  async update<T>(
+    table: AllowedTable,
+    id: string,
+    data: Partial<T>
+  ): Promise<T> {
+    try {
+      // Remove fields that shouldn't be updated directly
+      const updateData = { ...data };
+      delete (updateData as any).company_id;
+      delete (updateData as any).created_at;
+      
+      const { data: updatedRecord, error } = await this.supabase
+        .from(table)
+        .update(updateData as any)
+        .eq('id', id)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      if (!updatedRecord) throw new Error(`Record not found in ${table}`);
+      
+      return updatedRecord as T;
+    } catch (error) {
+      console.error(`Error updating record in ${table}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Delete a record by ID
+   */
+  async delete(
+    table: AllowedTable,
+    id: string
+  ): Promise<{ success: boolean }> {
+    try {
+      const { error } = await this.supabase
+        .from(table)
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      return { success: true };
+    } catch (error) {
+      console.error(`Error deleting record from ${table}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * List records with pagination and filtering
+   */
+  async list<T>(
+    table: AllowedTable,
+    {
+      page = 1,
+      limit = 50,
+      filters = {},
+      orderBy = 'created_at',
+      ascending = false
+    }: {
+      page?: number;
+      limit?: number;
+      filters?: Record<string, any>;
+      orderBy?: string;
+      ascending?: boolean;
+    } = {}
+  ): Promise<{ data: T[]; count: number }> {
+    try {
+      // Calculate pagination
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      
+      // Start building the query
+      let query = this.supabase
+        .from(table)
+        .select('*', { count: 'exact' })
+        .range(from, to);
+        
+      // Apply filters
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          if (typeof value === 'string' && value.includes('*')) {
+            // Use ILIKE for pattern matching
+            query = query.ilike(key, value.replace(/\*/g, '%'));
+          } else {
+            query = query.eq(key, value);
+          }
+        }
+      });
+      
+      // Apply ordering
+      query = ascending 
+        ? query.order(orderBy, { ascending: true })
+        : query.order(orderBy, { ascending: false });
+        
+      const { data, error, count } = await query;
+      
+      if (error) throw error;
+      
+      return {
+        data: (data || []) as T[],
+        count: count || 0
+      };
+    } catch (error) {
+      console.error(`Error listing records from ${table}:`, error);
+      throw error;
+    }
   }
 }
 
-/**
- * Insert data into a table
- */
-export async function insertTableData<T>(table: AllowedTable, data: T): Promise<T | null> {
-  try {
-    const { data: insertedData, error } = await supabase
-      .from(table)
-      .insert([data])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return insertedData;
-  } catch (error) {
-    console.error('Error inserting table data:', error);
-    return null;
-  }
-}
-
-/**
- * Update data in a table
- */
-export async function updateTableData<T>(table: AllowedTable, id: string, updates: Partial<T>, idColumn: string = 'id'): Promise<T | null> {
-  try {
-    const { data: updatedData, error } = await supabase
-      .from(table)
-      .update(updates)
-      .eq(idColumn, id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return updatedData;
-  } catch (error) {
-    console.error('Error updating table data:', error);
-    return null;
-  }
-}
-
-/**
- * Delete data from a table
- */
-export async function deleteTableData(table: AllowedTable, id: string, idColumn: string = 'id'): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq(idColumn, id);
-
-    if (error) throw error;
-
-    return true;
-  } catch (error) {
-    console.error('Error deleting table data:', error);
-    return false;
-  }
-}
+// Export a singleton instance
+export const dataService = new DataIsolationService();

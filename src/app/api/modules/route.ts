@@ -1,15 +1,16 @@
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { fetchModules } from '@/lib/supabase/roles-service';
 
-export async function GET() {
+// Get all modules
+export async function GET(request: NextRequest) {
   try {
     const modules = await fetchModules();
-    return NextResponse.json({ modules });
-  } catch (error) {
+    return NextResponse.json(modules);
+  } catch (error: any) {
     console.error('Error fetching modules:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch modules' },
+      { error: error.message || 'Failed to fetch modules' },
       { status: 500 }
     );
   }

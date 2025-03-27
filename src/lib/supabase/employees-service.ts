@@ -112,37 +112,65 @@ export async function deleteEmployee(id: string): Promise<boolean> {
 /**
  * Invite an employee by sending them an invitation email
  */
-export async function inviteEmployee(employeeId: string): Promise<any> {
+export async function inviteEmployee(employeeId: string) {
   try {
-    // Fetch employee data first to get their email
+    const supabase = createClientComponentClient<Database>();
+    
+    // First, get the employee details
     const { data: employee, error: fetchError } = await supabase
       .from('employees')
       .select('*')
       .eq('id', employeeId)
       .single();
     
-    if (fetchError) throw fetchError;
-    if (!employee) throw new Error('Employee not found');
+    if (fetchError || !employee) {
+      throw fetchError || new Error('Employee not found');
+    }
     
-    // Mark employee as invited
+    // Update the employee to mark invitation as sent
     const { data: updatedEmployee, error: updateError } = await supabase
       .from('employees')
-      .update({ 
-        invitation_sent: true,
-        updated_at: new Date().toISOString()
-      })
+      .update({ invitation_sent: true })
       .eq('id', employeeId)
-      .select()
+      .select('*')
       .single();
     
-    if (updateError) throw updateError;
+    if (updateError) {
+      throw updateError;
+    }
     
-    // In a real implementation, this would also call an API to send the invitation email
-    // For now, we just mark the employee as invited and return success
-    
+    // In a real app, we would send an email invitation here
+    // For now, just return the updated employee
     return updatedEmployee;
   } catch (error) {
     console.error('Error inviting employee:', error);
     throw error;
   }
+}
+
+/**
+ * Send invitation to a newly created employee
+ * @param email Employee email
+ * @param full_name Employee full name
+ * @param role_id Employee role ID
+ * @param company_id Company ID
+ * @param is_admin Whether the employee is an admin
+ */
+export async function sendEmployeeInvitation(
+  email: string,
+  full_name: string,
+  role_id: string | null,
+  company_id: string,
+  is_admin: boolean
+) {
+  // In a real app, send an email invitation to the employee
+  console.log(`Sending invitation to ${email} (${full_name})`);
+  
+  // For now, just return a success message
+  return {
+    email,
+    full_name,
+    success: true,
+    message: `Invitation sent to ${email}`,
+  };
 }

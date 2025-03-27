@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { inviteEmployee } from '@/lib/supabase/employees-service';
 
-// Add the missing inviteEmployee function in employees-service
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
