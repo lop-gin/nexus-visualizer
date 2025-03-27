@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -9,77 +10,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { employeeInviteSchema, type EmployeeInvite, type Employee, PREDEFINED_ROLES } from '@/types/auth';
-import { Role } from '@/types/auth';
-
-// Mock data for roles - will be replaced with actual data from Supabase
-const mockRoles: Role[] = [
-  {
-    id: '1',
-    name: 'Admin',
-    description: 'Administrator with full access',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Sales Supervisor',
-    description: 'Manages sales team and has access to all sales functions',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    name: 'Sales Rep',
-    description: 'Can create and manage sales documents',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    name: 'Procurement Supervisor',
-    description: 'Manages procurement team and has access to all procurement functions',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '5',
-    name: 'Custom Role',
-    description: 'A custom role with specific permissions',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
-
-// Mock employee data - will be replaced with actual data from Supabase
-const mockEmployee: Employee = {
-  id: '1',
-  full_name: 'John Doe',
-  email: 'john.doe@example.com',
-  phone: '+1234567890',
-  company_name: 'Acme Inc',
-  company_type: 'Manufacturer',
-  role_id: '1',
-  role: {
-    id: '1',
-    name: 'Admin',
-    description: 'Administrator with full access',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  is_admin: true,
-  status: 'active',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  address: null,
-};
+import { employeeSchema, type Employee, type Role } from '@/types/auth';
+import { fetchRoles } from '@/lib/supabase/roles-service';
+import { fetchEmployeeById, updateEmployee, sendEmployeeInvitation } from '@/lib/supabase/employees-service';
 
 export default function EditEmployeePage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [roles, setRoles] = React.useState<Role[]>([]);
-  const [showCustomRole, setShowCustomRole] = React.useState(false);
   const [employee, setEmployee] = React.useState<Employee | null>(null);
   const [inviteOption, setInviteOption] = React.useState<'update' | 'update_and_invite'>('update');
 
@@ -87,43 +26,45 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
     control, 
     handleSubmit, 
     formState: { errors },
-    watch,
-    setValue,
     reset
-  } = useForm<EmployeeInvite>({
-    resolver: zodResolver(employeeInviteSchema),
+  } = useForm<Employee>({
+    resolver: zodResolver(employeeSchema),
     defaultValues: {
       full_name: '',
       email: '',
       phone: '',
       role_id: '',
-      custom_role: '',
+      is_admin: false,
     }
   });
-
-  const selectedRoleId = watch('role_id');
 
   // Load employee and roles
   React.useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Simulate API calls
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fetch roles
+        const rolesData = await fetchRoles();
+        setRoles(rolesData);
         
-        // In a real implementation, we would fetch employee and roles from Supabase
-        setEmployee(mockEmployee);
-        setRoles(mockRoles);
-        
-        // Set form values
-        reset({
-          full_name: mockEmployee.full_name,
-          email: mockEmployee.email,
-          phone: mockEmployee.phone || '',
-          role_id: mockEmployee.role_id,
-          custom_role: '',
-        });
-      } catch (error) {
+        // Fetch employee
+        if (params.id) {
+          const employeeData = await fetchEmployeeById(params.id);
+          if (employeeData) {
+            setEmployee(employeeData);
+            
+            // Set form values
+            reset({
+              full_name: employeeData.full_name,
+              email: employeeData.email,
+              phone: employeeData.phone || '',
+              role_id: employeeData.role_id || '',
+              is_admin: employeeData.is_admin,
+              status: employeeData.status,
+            });
+          }
+        }
+      } catch (error: any) {
         console.error('Error fetching data:', error);
         toast.error('Failed to load employee data');
       } finally {
@@ -134,35 +75,32 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
     fetchData();
   }, [params.id, reset]);
 
-  // Handle role selection change
-  React.useEffect(() => {
-    if (selectedRoleId === 'custom') {
-      setShowCustomRole(true);
-    } else {
-      setShowCustomRole(false);
-    }
-  }, [selectedRoleId]);
-
-  const onSubmit = async (data: EmployeeInvite) => {
+  const onSubmit = async (data: Employee) => {
+    if (!params.id) return;
+    
     setIsSubmitting(true);
     try {
-      // Here we would normally update the employee in the database
-      console.log('Employee data:', data);
-      console.log('Invite option:', inviteOption);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Update employee
+      await updateEmployee(params.id, {
+        full_name: data.full_name,
+        email: data.email,
+        phone: data.phone,
+        role_id: data.role_id,
+        is_admin: data.is_admin,
+      });
+
+      // Send invitation if requested
       if (inviteOption === 'update_and_invite') {
+        await sendEmployeeInvitation(params.id);
         toast.success('Employee updated and invitation sent');
       } else {
         toast.success('Employee updated successfully');
       }
       
       router.push('/dashboard/employees');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating employee:', error);
-      toast.error('Failed to update employee');
+      toast.error(error.message || 'Failed to update employee');
     } finally {
       setIsSubmitting(false);
     }
@@ -262,14 +200,7 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
                       <select
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          if (e.target.value === 'custom') {
-                            setShowCustomRole(true);
-                          } else {
-                            setShowCustomRole(false);
-                          }
-                        }}
+                        value={field.value || ""}
                       >
                         <option value="">Select a role</option>
                         {roles.map(role => (
@@ -277,7 +208,6 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
                             {role.name}
                           </option>
                         ))}
-                        <option value="custom">Create Custom Role</option>
                       </select>
                       {errors.role_id && (
                         <p className="text-xs text-red-500">{errors.role_id.message}</p>
@@ -286,19 +216,29 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
                   )}
                 />
                 
-                {showCustomRole && (
-                  <Controller
-                    name="custom_role"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        label="Custom Role Name"
-                        error={errors.custom_role?.message}
-                        {...field}
-                      />
-                    )}
-                  />
-                )}
+                <Controller
+                  name="is_admin"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="is_admin"
+                          className="h-4 w-4 text-blue-600 rounded"
+                          checked={field.value}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                        />
+                        <label htmlFor="is_admin" className="ml-2 block text-sm text-gray-700">
+                          Grant admin privileges
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Admins can manage employees, roles, and have access to all system settings.
+                      </p>
+                    </div>
+                  )}
+                />
               </div>
             </form>
           </CardContent>
@@ -320,11 +260,9 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
                   );
                 }}
                 variant="outline"
-                isLoading={isSubmitting && inviteOption === 'update'}
-                loadingText="Updating..."
                 disabled={isSubmitting}
               >
-                Update Employee
+                {isSubmitting && inviteOption === 'update' ? 'Updating...' : 'Update Employee'}
               </Button>
               <Button
                 type="button"
@@ -334,11 +272,9 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
                     new Event('submit', { cancelable: true, bubbles: true })
                   );
                 }}
-                isLoading={isSubmitting && inviteOption === 'update_and_invite'}
-                loadingText="Updating & Inviting..."
                 disabled={isSubmitting}
               >
-                Update & Invite
+                {isSubmitting && inviteOption === 'update_and_invite' ? 'Updating & Inviting...' : 'Update & Invite'}
               </Button>
             </div>
           </CardFooter>

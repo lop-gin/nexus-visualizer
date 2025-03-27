@@ -1,65 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { Database } from '@/types/supabase';
 
-// API route to check if user has permission for a specific action on a module
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { module: string; action: string } }
-) {
+import { NextRequest, NextResponse } from 'next/server';
+import { updateRolePermission } from '@/lib/supabase/roles-service';
+import { supabase } from '@/lib/supabase/client';
+
+interface RouteParams {
+  params: {
+    module: string;
+    action: 'view' | 'create' | 'edit' | 'delete';
+  };
+}
+
+/**
+ * Updates permission for a role on a specific module and action
+ * 
+ * Request body should include:
+ * - roleId: string (ID of the role)
+ * - value: boolean (permission value - true for allow, false for deny)
+ */
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { module, action } = params;
+    const { roleId, value } = await request.json();
     
-    // Validate action
+    if (!roleId) {
+      throw new Error('Role ID is required');
+    }
+    
+    if (value === undefined) {
+      throw new Error('Permission value is required');
+    }
+    
     if (!['view', 'create', 'edit', 'delete'].includes(action)) {
-      return NextResponse.json(
-        { error: 'Invalid action' },
-        { status: 400 }
-      );
+      throw new Error('Invalid action');
     }
     
-    // Get user from session
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore });
-    
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError || !session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const userId = session.user.id;
-    
-    // Get user's role
-    const { data: employee, error: employeeError } = await supabase
-      .from('employees')
-      .select('role_id, is_admin')
-      .eq('user_id', userId)
-      .single();
-    
-    if (employeeError) {
-      console.error('Error fetching employee:', employeeError);
-      return NextResponse.json(
-        { error: 'Failed to fetch employee data' },
-        { status: 500 }
-      );
-    }
-    
-    // If user is admin, they have all permissions
-    if (employee.is_admin) {
-      return NextResponse.json({ hasPermission: true });
-    }
-    
-    // If user has no role, they have no permissions
-    if (!employee.role_id) {
-      return NextResponse.json({ hasPermission: false });
-    }
-    
-    // Get module ID
+    // Get the module ID from its name
     const { data: moduleData, error: moduleError } = await supabase
       .from('modules')
       .select('id')
@@ -67,32 +42,81 @@ export async function GET(
       .single();
     
     if (moduleError) {
-      console.error('Error fetching module:', moduleError);
-      return NextResponse.json(
-        { error: 'Failed to fetch module data' },
-        { status: 500 }
-      );
+      throw new Error(`Module "${module}" not found`);
     }
     
-    // Check permission
+    // Format action to match database column name
+    const dbAction = `can_${action}` as 'can_view' | 'can_create' | 'can_edit' | 'can_delete';
+    
+    // Update the permission
+    await updateRolePermission(roleId, moduleData.id, dbAction, value);
+    
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating permission:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to update permission' },
+      { status: 400 }
+    );
+  }
+}
+
+/**
+ * Gets the current permission for a role on a specific module and action
+ * 
+ * Request should include query parameter:
+ * - roleId: string (ID of the role)
+ */
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { module, action } = params;
+    const { searchParams } = new URL(request.url);
+    const roleId = searchParams.get('roleId');
+    
+    if (!roleId) {
+      throw new Error('Role ID is required');
+    }
+    
+    if (!['view', 'create', 'edit', 'delete'].includes(action)) {
+      throw new Error('Invalid action');
+    }
+    
+    // Get the module ID from its name
+    const { data: moduleData, error: moduleError } = await supabase
+      .from('modules')
+      .select('id')
+      .eq('name', module)
+      .single();
+    
+    if (moduleError) {
+      throw new Error(`Module "${module}" not found`);
+    }
+    
+    // Get the permission
     const { data: permission, error: permissionError } = await supabase
       .from('permissions')
-      .select(`can_${action}`)
-      .eq('role_id', employee.role_id)
+      .select('*')
+      .eq('role_id', roleId)
       .eq('module_id', moduleData.id)
       .single();
     
-    if (permissionError) {
-      console.error('Error fetching permission:', permissionError);
-      return NextResponse.json({ hasPermission: false });
+    if (permissionError && permissionError.code !== 'PGRST116') { // PGRST116 is the error code for no rows returned
+      throw permissionError;
     }
     
-    return NextResponse.json({ hasPermission: permission[`can_${action}`] || false });
-  } catch (error) {
-    console.error('Error checking permission:', error);
+    // Format action to match database column name
+    const dbAction = `can_${action}` as 'can_view' | 'can_create' | 'can_edit' | 'can_delete';
+    
+    // Return permission value (default to false if not found)
+    return NextResponse.json({ 
+      success: true, 
+      value: permission ? permission[dbAction] : false 
+    });
+  } catch (error: any) {
+    console.error('Error getting permission:', error);
     return NextResponse.json(
-      { error: 'Failed to check permission' },
-      { status: 500 }
+      { success: false, error: error.message || 'Failed to get permission' },
+      { status: 400 }
     );
   }
 }

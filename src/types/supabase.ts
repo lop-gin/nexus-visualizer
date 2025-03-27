@@ -1,3 +1,4 @@
+
 // This file defines the Supabase database types
 // It will be used to provide type safety when interacting with the database
 
@@ -59,6 +60,7 @@ export interface Database {
           status: string
           created_at: string
           updated_at: string
+          invitation_sent?: boolean
         }
         Insert: {
           id?: string
@@ -73,6 +75,7 @@ export interface Database {
           status?: string
           created_at?: string
           updated_at?: string
+          invitation_sent?: boolean
         }
         Update: {
           id?: string
@@ -87,6 +90,7 @@ export interface Database {
           status?: string
           created_at?: string
           updated_at?: string
+          invitation_sent?: boolean
         }
         Relationships: [
           {
@@ -267,12 +271,193 @@ export interface Database {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          id: number
+          name: string
+          description: string | null
+          primary_unit_of_measure: string
+          secondary_unit_of_measure: string | null
+          conversion_factor: number | null
+        }
+        Insert: {
+          id?: number
+          name: string
+          description?: string | null
+          primary_unit_of_measure: string
+          secondary_unit_of_measure?: string | null
+          conversion_factor?: number | null
+        }
+        Update: {
+          id?: number
+          name?: string
+          description?: string | null
+          primary_unit_of_measure?: string
+          secondary_unit_of_measure?: string | null
+          conversion_factor?: number | null
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          id: string
+          transaction_number: string
+          transaction_type: string
+          customer_id: string
+          sales_rep_id: string | null
+          transaction_date: string
+          due_date: string | null
+          terms: string | null
+          message: string | null
+          net_total: number
+          tax_total: number
+          other_fees: number
+          gross_total: number
+          status: string
+        }
+        Insert: {
+          id?: string
+          transaction_number: string
+          transaction_type: string
+          customer_id: string
+          sales_rep_id?: string | null
+          transaction_date: string
+          due_date?: string | null
+          terms?: string | null
+          message?: string | null
+          net_total: number
+          tax_total: number
+          other_fees: number
+          gross_total: number
+          status: string
+        }
+        Update: {
+          id?: string
+          transaction_number?: string
+          transaction_type?: string
+          customer_id?: string
+          sales_rep_id?: string | null
+          transaction_date?: string
+          due_date?: string | null
+          terms?: string | null
+          message?: string | null
+          net_total?: number
+          tax_total?: number
+          other_fees?: number
+          gross_total?: number
+          status?: string
+        }
+        Relationships: []
+      }
+      transaction_items: {
+        Row: {
+          id: number
+          transaction_id: string
+          product_id: string | null
+          description: string | null
+          quantity: number
+          unit_of_measure: string
+          unit_type: string
+          unit_price: number
+          tax_percent: number
+          amount: number
+          primary_quantity: number | null
+        }
+        Insert: {
+          id?: number
+          transaction_id: string
+          product_id?: string | null
+          description?: string | null
+          quantity: number
+          unit_of_measure: string
+          unit_type: string
+          unit_price: number
+          tax_percent: number
+          amount: number
+          primary_quantity?: number | null
+        }
+        Update: {
+          id?: number
+          transaction_id?: string
+          product_id?: string | null
+          description?: string | null
+          quantity?: number
+          unit_of_measure?: string
+          unit_type?: string
+          unit_price?: number
+          tax_percent?: number
+          amount?: number
+          primary_quantity?: number | null
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          id: string
+          name: string
+          email: string | null
+          phone: string | null
+          address: string | null
+          company: string | null
+          billing_address: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          company?: string | null
+          billing_address?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          company?: string | null
+          billing_address?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_product_units: {
+        Args: {
+          product_id: number
+        }
+        Returns: {
+          unit_type: string
+          unit_name: string
+        }[]
+      }
+      insert_predefined_roles: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
+      set_app_variables: {
+        Args: {
+          p_user_id: string
+          p_company_id: string
+        }
+        Returns: undefined
+      }
+      exec_sql: {
+        Args: {
+          sql_query: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

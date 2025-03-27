@@ -1,38 +1,58 @@
+
 import { NextRequest, NextResponse } from 'next/server';
-import { executeMigrations, initializeDatabase, isDatabaseInitialized } from '@/lib/supabase/migrations';
+import { createRoles, createModules } from '@/lib/supabase/migrations';
 
-// API route to initialize database
-export async function GET() {
+/**
+ * API route for initializing and migrating Supabase database.
+ * This should only be used in development and managed deployments.
+ */
+export async function GET(request: NextRequest) {
   try {
-    const isInitialized = await isDatabaseInitialized();
+    // Check if API key is provided as a query parameter for security
+    const { searchParams } = new URL(request.url);
+    const apiKey = searchParams.get('apiKey');
     
-    return NextResponse.json({ initialized: isInitialized });
-  } catch (error: any) {
-    console.error('Error checking database initialization:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to check database initialization' },
-      { status: 500 }
-    );
-  }
-}
-
-// API route to execute migrations
-export async function POST() {
-  try {
-    const result = await initializeDatabase();
-    
-    if (!result.success) {
+    if (!apiKey || apiKey !== process.env.MIGRATION_API_KEY) {
       return NextResponse.json(
-        { error: result.error || 'Failed to initialize database' },
-        { status: 500 }
+        { success: false, message: 'Invalid API key' },
+        { status: 401 }
       );
     }
     
-    return NextResponse.json(result);
+    // Perform migrations
+    const results = [];
+    
+    // Create roles table and insert predefined roles
+    try {
+      const rolesResult = await createRoles();
+      results.push({ operation: 'createRoles', success: true });
+    } catch (error: any) {
+      console.error('Error creating roles:', error);
+      results.push({ 
+        operation: 'createRoles', 
+        success: false,
+        message: error.message 
+      });
+    }
+    
+    // Create modules table and insert default modules
+    try {
+      const modulesResult = await createModules();
+      results.push({ operation: 'createModules', success: true });
+    } catch (error: any) {
+      console.error('Error creating modules:', error);
+      results.push({ 
+        operation: 'createModules', 
+        success: false, 
+        message: error.message 
+      });
+    }
+    
+    return NextResponse.json({ success: true, results });
   } catch (error: any) {
-    console.error('Error initializing database:', error);
+    console.error('Error running migrations:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to initialize database' },
+      { success: false, message: error.message || 'Failed to run migrations' },
       { status: 500 }
     );
   }

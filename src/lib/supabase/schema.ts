@@ -1,5 +1,6 @@
+
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '../types/supabase';
+import { Database } from '@/types/supabase';
 
 export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T];
@@ -108,7 +109,8 @@ CREATE TABLE IF NOT EXISTS public.employees (
     is_admin BOOLEAN DEFAULT FALSE,
     status TEXT DEFAULT 'invited' CHECK (status IN ('active', 'inactive', 'invited')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    invitation_sent BOOLEAN DEFAULT FALSE
 );
 
 -- Add unique constraint on email within a company

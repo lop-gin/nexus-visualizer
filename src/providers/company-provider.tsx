@@ -1,3 +1,4 @@
+
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from '@/types/supabase';
 import { useRouter } from 'next/navigation';
@@ -113,14 +114,18 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
       setIsAdmin(isUserAdmin);
 
       // Fetch permissions for the user's role
-      const permissionsData = await fetchPermissions(profile.role_id);
-      setPermissions(permissionsData);
+      if (profile.role_id) {
+        const permissionsData = await fetchPermissions(profile.role_id);
+        setPermissions(permissionsData);
+      }
 
       // Set company context for RLS policies
-      await supabase.rpc('set_app_variables', {
-        p_user_id: session.user.id,
-        p_company_id: profile.company_id
-      });
+      if (profile.company_id) {
+        await supabase.rpc('set_app_variables', {
+          p_user_id: session.user.id,
+          p_company_id: profile.company_id
+        });
+      }
     } catch (error) {
       console.error('Error setting up company context:', error);
       toast.error('Failed to load user permissions');

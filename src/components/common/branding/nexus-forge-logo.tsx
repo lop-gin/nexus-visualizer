@@ -1,53 +1,57 @@
+
 import React from 'react';
-import { motion } from 'framer-motion';
+import Image from 'next/image';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
-export const NexusForgeLogo = ({ size = 'md' }) => {
-  // Size variants
-  const sizes = {
-    sm: {
-      container: 'w-8 h-8',
-      text: 'text-lg'
-    },
-    md: {
-      container: 'w-10 h-10',
-      text: 'text-xl'
-    },
-    lg: {
-      container: 'w-12 h-12',
-      text: 'text-2xl'
-    }
-  };
+interface LogoProps {
+  size?: 'sm' | 'md' | 'lg';
+  showText?: boolean;
+  className?: string;
+}
 
-  const logoVariants = {
-    initial: { scale: 0.5, opacity: 0 },
-    animate: { 
-      scale: 1, 
-      opacity: 1,
-      transition: { 
-        type: 'spring', 
-        stiffness: 200, 
-        damping: 10,
-        duration: 0.5 
-      }
-    },
-    hover: { scale: 1.05 }
-  };
+const sizes = {
+  sm: {
+    container: 'h-8',
+    text: 'text-xl',
+  },
+  md: {
+    container: 'h-10',
+    text: 'text-2xl',
+  },
+  lg: {
+    container: 'h-12',
+    text: 'text-3xl',
+  },
+};
+
+export const NexusForgeLogo: React.FC<LogoProps> = ({
+  size = 'md',
+  showText = true,
+  className,
+}) => {
+  const sizeConfig = sizes[size as keyof typeof sizes];
 
   return (
-    <motion.div 
-      className="flex items-center space-x-2"
-      initial="initial"
-      animate="animate"
-      whileHover="hover"
-      variants={logoVariants}
-    >
-      <div className={`${sizes[size].container} bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center`}>
-        <span className={`text-white ${sizes[size].text} font-bold`}>NF</span>
+    <Link href="/" className={cn('flex items-center', className)}>
+      <div className={cn('relative flex items-center', sizeConfig.container)}>
+        <div className="relative h-full aspect-square">
+          <Image
+            src="/images/logo.svg"
+            alt="Nexus Forge Logo"
+            fill
+            className="object-contain"
+            priority
+          />
+        </div>
+        {showText && (
+          <div className={cn('ml-2 font-bold tracking-tight', sizeConfig.text)}>
+            <span className="text-primary">Nexus</span>{' '}
+            <span className="text-muted-foreground dark:text-gray-300">Forge</span>
+          </div>
+        )}
       </div>
-      <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-700">
-        NexusForge
-      </span>
-    </motion.div>
+    </Link>
   );
 };
 

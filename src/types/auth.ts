@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 // Define predefined roles
@@ -45,6 +46,7 @@ export const roleSchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, "Role name is required"),
   description: z.string().nullable().optional(),
+  is_predefined: z.boolean().optional(),
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
   permissions: z.array(permissionSchema).optional(),
@@ -59,6 +61,7 @@ export const employeeSchema = z.object({
   email: z.string().email("Valid email is required"),
   phone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
+  company_id: z.string().optional(),
   company_name: z.string().nullable().optional(),
   company_type: z.string().nullable().optional(),
   role_id: z.string().uuid().nullable().optional(),
@@ -67,6 +70,8 @@ export const employeeSchema = z.object({
   status: z.enum(['active', 'inactive', 'invited']).default('active'),
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
+  user_id: z.string().nullable().optional(),
+  invitation_sent: z.boolean().optional(),
 });
 
 export type Employee = z.infer<typeof employeeSchema>;
