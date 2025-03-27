@@ -11,8 +11,6 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { employeeSchema, type Employee, type Role } from '@/types/auth';
-import { fetchRoles } from '@/lib/supabase/roles-service';
-import { fetchEmployeeById, updateEmployee, sendEmployeeInvitation } from '@/lib/supabase/employees-service';
 
 export default function EditEmployeePage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -81,13 +79,14 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
     setIsSubmitting(true);
     try {
       // Update employee
-      await updateEmployee(params.id, {
-        full_name: data.full_name,
-        email: data.email,
-        phone: data.phone,
-        role_id: data.role_id,
-        is_admin: data.is_admin,
-      });
+      await updateEmployee(
+        params.id,
+        data.full_name,
+        data.email,
+        data.phone || null,
+        data.role_id || '',
+        data.is_admin
+      );
 
       // Send invitation if requested
       if (inviteOption === 'update_and_invite') {
@@ -104,6 +103,79 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper function to make API calls
+  const fetchRoles = async () => {
+    const response = await fetch('/api/roles');
+    if (!response.ok) {
+      throw new Error('Failed to fetch roles');
+    }
+    const data = await response.json();
+    return data.roles;
+  };
+
+  const fetchEmployeeById = async (id: string) => {
+    const response = await fetch(`/api/employees/${id}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch employee');
+    }
+    return response.json();
+  };
+
+  const updateEmployee = async (
+    id: string,
+    full_name: string,
+    email: string,
+    phone: string | null,
+    role_id: string,
+    is_admin: boolean
+  ) => {
+    const response = await fetch(`/api/employees/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        full_name,
+        email,
+        phone,
+        role_id,
+        is_admin,
+        send_invite: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update employee');
+    }
+    
+    return response.json();
+  };
+
+  const sendEmployeeInvitation = async (id: string) => {
+    const response = await fetch(`/api/employees/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        full_name: employee?.full_name || '',
+        email: employee?.email || '',
+        phone: employee?.phone || '',
+        role_id: employee?.role_id || '',
+        is_admin: employee?.is_admin || false,
+        send_invite: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send invitation');
+    }
+    
+    return response.json();
   };
 
   if (isLoading) {
@@ -184,7 +256,11 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
                     <Input
                       label="Phone Number"
                       error={errors.phone?.message}
-                      {...field}
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
                     />
                   )}
                 />

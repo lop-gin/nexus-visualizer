@@ -1,5 +1,6 @@
+
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchEmployeeById, updateEmployee, deleteEmployee, inviteEmployee } from '@/lib/supabase/employees-service';
+import { fetchEmployeeById, updateEmployee, deleteEmployee, sendEmployeeInvitation } from '@/lib/supabase/employees-service';
 
 // API route to get a specific employee by ID
 export async function GET(
@@ -46,7 +47,7 @@ export async function PUT(
     
     // Send invitation if requested
     if (send_invite) {
-      await inviteEmployee(params.id);
+      await sendEmployeeInvitation(params.id);
     }
     
     return NextResponse.json(updatedEmployee);

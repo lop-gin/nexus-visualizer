@@ -1,5 +1,6 @@
+
 import { NextRequest, NextResponse } from 'next/server';
-import { createRole, updateRole, deleteRole, fetchRoleById } from '@/lib/supabase/roles-service';
+import { fetchRoleById, updateRole, deleteRole } from '@/lib/supabase/roles-service';
 
 // API route to get a specific role by ID
 export async function GET(
@@ -33,9 +34,12 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { name, description, permissions } = body;
+    const updates = {
+      name: body.name,
+      description: body.description,
+    };
     
-    const updatedRole = await updateRole(params.id, name, description, permissions);
+    const updatedRole = await updateRole(params.id, updates);
     
     return NextResponse.json(updatedRole);
   } catch (error: any) {

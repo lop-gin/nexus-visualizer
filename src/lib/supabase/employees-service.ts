@@ -81,18 +81,18 @@ export const fetchEmployeeById = async (employeeId: string): Promise<Employee | 
   }
 };
 
-export const createEmployee = async (employee: Omit<Employee, 'id' | 'created_at' | 'updated_at'>, sendInvite: boolean = false): Promise<Employee> => {
+export const createEmployee = async (employeeData: Omit<Employee, 'id' | 'created_at' | 'updated_at'>, sendInvite: boolean = false): Promise<Employee> => {
   try {
     const { data, error } = await supabase
       .from('employees')
       .insert({
-        full_name: employee.full_name,
-        email: employee.email,
-        phone: employee.phone,
-        address: employee.address,
-        company_id: employee.company_id,
-        role_id: employee.role_id,
-        is_admin: employee.is_admin,
+        full_name: employeeData.full_name,
+        email: employeeData.email,
+        phone: employeeData.phone,
+        address: employeeData.address,
+        company_id: employeeData.company_id || '',
+        role_id: employeeData.role_id,
+        is_admin: employeeData.is_admin,
         status: 'invited',
         invitation_sent: sendInvite,
       })
@@ -127,14 +127,27 @@ export const createEmployee = async (employee: Omit<Employee, 'id' | 'created_at
   }
 };
 
-export const updateEmployee = async (employeeId: string, updates: Partial<Omit<Employee, 'id' | 'created_at' | 'updated_at'>>): Promise<Employee> => {
+export const updateEmployee = async (
+  employeeId: string,
+  full_name: string,
+  email: string,
+  phone: string | null,
+  role_id: string,
+  is_admin: boolean
+): Promise<Employee> => {
   try {
+    const updates = {
+      full_name,
+      email,
+      phone,
+      role_id,
+      is_admin,
+      updated_at: new Date().toISOString(),
+    };
+
     const { data, error } = await supabase
       .from('employees')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', employeeId)
       .select()
       .single();
@@ -192,16 +205,37 @@ export const sendEmployeeInvitation = async (employeeId: string): Promise<Employ
       throw new Error('Employee not found');
     }
     
-    // TODO: Send invitation email
-    
     // Update employee to mark invitation as sent
-    const updatedEmployee = await updateEmployee(employeeId, {
-      invitation_sent: true,
-    });
+    const updatedEmployee = await updateEmployee(
+      employeeId, 
+      employee.full_name, 
+      employee.email, 
+      employee.phone, 
+      employee.role_id || '', 
+      employee.is_admin
+    );
     
-    return updatedEmployee;
+    // Set invitation_sent to true
+    const { data, error } = await supabase
+      .from('employees')
+      .update({ invitation_sent: true })
+      .eq('id', employeeId)
+      .select()
+      .single();
+      
+    if (error) {
+      throw error;
+    }
+    
+    return {
+      ...updatedEmployee,
+      invitation_sent: true
+    };
   } catch (error) {
     console.error('Error sending employee invitation:', error);
     throw error;
   }
 };
+
+// Alias for the API route
+export const inviteEmployee = sendEmployeeInvitation;

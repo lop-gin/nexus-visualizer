@@ -53,6 +53,24 @@ export const fetchRoles = async (): Promise<Role[]> => {
   }
 };
 
+export const fetchModules = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('modules')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error fetching modules:', error);
+    throw error;
+  }
+};
+
 export const fetchRoleById = async (roleId: string): Promise<Role | null> => {
   try {
     const { data, error } = await supabase
@@ -109,15 +127,19 @@ export const fetchRoleById = async (roleId: string): Promise<Role | null> => {
   }
 };
 
-export const createRole = async (role: Omit<Role, 'id' | 'created_at' | 'updated_at' | 'permissions'>, permissions?: Omit<Permission, 'id' | 'role_id' | 'created_at' | 'updated_at'>[]): Promise<Role> => {
+export const createRole = async (
+  name: string, 
+  description: string | null = null, 
+  permissions: any[] = []
+): Promise<Role> => {
   try {
     // Insert the role
     const { data: roleData, error: roleError } = await supabase
       .from('roles')
       .insert({
-        name: role.name,
-        description: role.description,
-        is_predefined: role.is_predefined || false,
+        name,
+        description,
+        is_predefined: false,
       })
       .select()
       .single();
@@ -146,7 +168,7 @@ export const createRole = async (role: Omit<Role, 'id' | 'created_at' | 'updated
       // Prepare permissions for insertion
       const permissionsToInsert = permissions.map(perm => ({
         role_id: roleData.id,
-        module_id: moduleMap.get(perm.module),
+        module_id: moduleMap.get(perm.module) || perm.module_id,
         can_view: perm.can_view,
         can_create: perm.can_create,
         can_edit: perm.can_edit,
@@ -171,66 +193,23 @@ export const createRole = async (role: Omit<Role, 'id' | 'created_at' | 'updated
   }
 };
 
-export const updateRole = async (roleId: string, updates: Partial<Omit<Role, 'id' | 'created_at' | 'updated_at' | 'permissions'>>, permissions?: Omit<Permission, 'id' | 'role_id' | 'created_at' | 'updated_at'>[]): Promise<Role> => {
+export const updateRole = async (
+  roleId: string, 
+  updates: Partial<Role>
+): Promise<Role> => {
   try {
     // Update the role
     const { error: roleError } = await supabase
       .from('roles')
       .update({
-        ...updates,
+        name: updates.name,
+        description: updates.description,
         updated_at: new Date().toISOString(),
       })
       .eq('id', roleId);
     
     if (roleError) {
       throw roleError;
-    }
-    
-    // If permissions are provided, update them
-    if (permissions) {
-      // Fetch modules to get module IDs
-      const { data: modules, error: modulesError } = await supabase
-        .from('modules')
-        .select('id, name');
-      
-      if (modulesError) {
-        throw modulesError;
-      }
-      
-      // Create a map of module names to IDs
-      const moduleMap = new Map();
-      modules.forEach(module => {
-        moduleMap.set(module.name, module.id);
-      });
-      
-      // Delete existing permissions for this role
-      const { error: deleteError } = await supabase
-        .from('permissions')
-        .delete()
-        .eq('role_id', roleId);
-      
-      if (deleteError) {
-        throw deleteError;
-      }
-      
-      // Prepare permissions for insertion
-      const permissionsToInsert = permissions.map(perm => ({
-        role_id: roleId,
-        module_id: moduleMap.get(perm.module),
-        can_view: perm.can_view,
-        can_create: perm.can_create,
-        can_edit: perm.can_edit,
-        can_delete: perm.can_delete,
-      }));
-      
-      // Insert permissions
-      const { error: permissionsError } = await supabase
-        .from('permissions')
-        .insert(permissionsToInsert);
-      
-      if (permissionsError) {
-        throw permissionsError;
-      }
     }
     
     // Fetch the updated role with permissions
@@ -303,7 +282,7 @@ export const updateRolePermission = async (
       
       const { error: insertError } = await supabase
         .from('permissions')
-        .insert(newPermission);
+        .insert([newPermission]);
       
       if (insertError) {
         throw insertError;
