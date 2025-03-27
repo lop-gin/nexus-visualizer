@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
 
@@ -7,7 +8,13 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://aoyaamulrgp
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFveWFhbXVscmdwZGlkenBvdHR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5OTU1MjYsImV4cCI6MjA1ODU3MTUyNn0.9DhaZQEjOZ5gPXfq14Kz2QdPoVwh-BBd6-Ho-I7TmLM';
 
 // Create a single supabase client for interacting with your database
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    autoRefreshToken: true,
+  }
+});
 
 // Function to check if Supabase connection is working
 export async function checkSupabaseConnection() {

@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -67,4 +68,30 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Background texture and gradient enhancements */
+.bg-texture-light {
+  background-image: 
+    radial-gradient(at 50% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(99, 102, 241, 0.1) 0px, transparent 50%);
+}
+
+.bg-texture-dark {
+  background-image: 
+    radial-gradient(at 50% 0%, rgba(59, 130, 246, 0.3) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(99, 102, 241, 0.3) 0px, transparent 50%);
+}
+
+/* Add more defined blur effects for better texture visibility */
+.blur-blob {
+  filter: blur(70px);
+  opacity: 0.5;
+  z-index: 0;
+}
+
+/* Ensure z-indexing is correct to show content above blurred backgrounds */
+.content-above-texture {
+  position: relative;
+  z-index: 1;
 }

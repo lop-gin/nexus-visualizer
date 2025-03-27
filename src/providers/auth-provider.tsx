@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -20,31 +21,39 @@ type AuthContextType = {
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient<Database>({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://aoyaamulrgpdidzpotty.supabase.co',
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFveWFhbXVscmdwZGlkenBvdHR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5OTU1MjYsImV4cCI6MjA1ODU3MTUyNn0.9DhaZQEjOZ5gPXfq14Kz2QdPoVwh-BBd6-Ho-I7TmLM',
+    options: {
+      auth: {
+        persistSession: true,
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        autoRefreshToken: true,
+      }
+    }
+  });
   const router = useRouter();
   const [user, setUser] = React.useState<any | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   // Check for session on mount
   React.useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
       setIsLoading(false);
+    });
 
-      // Set up auth state listener
-      const { data: { subscription } } = await supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          setUser(session?.user || null);
-        }
-      );
-
-      return () => {
-        subscription.unsubscribe();
-      };
+    return () => {
+      subscription.unsubscribe();
     };
-
-    getSession();
   }, [supabase.auth]);
 
   // Sign up with email and password

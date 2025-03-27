@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -5,9 +6,11 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { NexusForgeLogoLink } from '../register/page';
+import { useAuth } from '@/providers/auth-provider';
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { forgotPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -58,14 +61,10 @@ export default function ForgotPasswordPage() {
     setError('');
     
     try {
-      // Here you would normally call your password reset API
-      // For now, we'll simulate a successful request
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Show success message
+      await forgotPassword(email);
       setSuccess(true);
-    } catch (err) {
-      setError('Failed to send reset link. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset link. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -74,14 +73,44 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col">
+      {/* Background texture elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <motion.div 
+          className="absolute top-20 left-10 w-64 h-64 rounded-full bg-blue-100 dark:bg-blue-900 opacity-30 blur-blob"
+          animate={{ 
+            x: [0, 30, 0], 
+            y: [0, 20, 0],
+            scale: [1, 1.1, 1]
+          }}
+          transition={{ 
+            duration: 15, 
+            repeat: Infinity,
+            repeatType: "reverse" 
+          }}
+        />
+        <motion.div 
+          className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-indigo-100 dark:bg-indigo-900 opacity-30 blur-blob"
+          animate={{ 
+            x: [0, -40, 0], 
+            y: [0, 30, 0],
+            scale: [1, 1.2, 1]
+          }}
+          transition={{ 
+            duration: 18, 
+            repeat: Infinity,
+            repeatType: "reverse" 
+          }}
+        />
+      </div>
+      
       {/* Header with logo */}
-      <header className="w-full py-6 px-6">
+      <header className="relative z-10 w-full py-6 px-6">
         <div className="max-w-7xl mx-auto">
           <NexusForgeLogoLink />
         </div>
       </header>
       
-      <div className="flex-grow flex items-center justify-center p-6">
+      <div className="flex-grow flex items-center justify-center p-6 relative z-10">
         <motion.div 
           className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl overflow-hidden max-w-md w-full p-8"
           initial={{ opacity: 0, y: 20 }}
@@ -217,7 +246,7 @@ export default function ForgotPasswordPage() {
       </div>
       
       {/* Footer */}
-      <footer className="w-full py-6 px-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+      <footer className="relative z-10 w-full py-6 px-6 text-center text-gray-500 dark:text-gray-400 text-sm">
         <p>© {new Date().getFullYear()} NexusForge. All rights reserved.</p>
       </footer>
     </div>
