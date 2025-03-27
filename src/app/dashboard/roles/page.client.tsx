@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -11,6 +12,7 @@ import { Database } from '@/types/supabase';
 import { Role } from '@/types/auth';
 import { PlusCircle, Edit, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ensureString } from '@/lib/utils';
 
 export default function RolesPage() {
   const router = useRouter();
@@ -50,10 +52,14 @@ export default function RolesPage() {
   };
 
   const handleEditRole = (roleId: string) => {
-    router.push(`/dashboard/roles/${roleId}`);
+    if (roleId) {
+      router.push(`/dashboard/roles/${roleId}`);
+    }
   };
 
   const handleDeleteRole = async (roleId: string, roleName: string, isPredefined: boolean) => {
+    if (!roleId) return;
+    
     if (isPredefined) {
       toast.error(`Cannot delete predefined role: ${roleName}`);
       return;
@@ -86,11 +92,11 @@ export default function RolesPage() {
   const columns = [
     {
       header: 'Role Name',
-      accessor: 'name',
+      accessor: (role: Role) => role.name,
     },
     {
       header: 'Description',
-      accessor: 'description',
+      accessor: (role: Role) => role.description || 'No description',
       className: 'hidden md:table-cell',
     },
     {
@@ -114,7 +120,9 @@ export default function RolesPage() {
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              handleEditRole(role.id);
+              if (role.id) {
+                handleEditRole(role.id);
+              }
             }}
           >
             <Edit className="h-4 w-4" />
@@ -127,9 +135,11 @@ export default function RolesPage() {
             className={`${role.is_predefined ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:text-red-700 hover:bg-red-50'}`}
             onClick={(e) => {
               e.stopPropagation();
-              handleDeleteRole(role.id, role.name, role.is_predefined);
+              if (role.id) {
+                handleDeleteRole(role.id, role.name, !!role.is_predefined);
+              }
             }}
-            disabled={role.is_predefined || isDeleting === role.id}
+            disabled={!!role.is_predefined || isDeleting === role.id}
           >
             {isDeleting === role.id ? (
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -153,8 +163,8 @@ export default function RolesPage() {
           <h1 className="text-2xl font-semibold text-gray-800">Roles Management</h1>
           <Button 
             onClick={handleAddRole}
-            leftIcon={<PlusCircle className="h-4 w-4 mr-2" />}
           >
+            <PlusCircle className="h-4 w-4 mr-2" />
             Add Custom Role
           </Button>
         </div>
@@ -168,7 +178,7 @@ export default function RolesPage() {
               data={roles}
               columns={columns}
               isLoading={isLoading}
-              onRowClick={(role) => handleEditRole(role.id)}
+              onRowClick={(role) => role.id && handleEditRole(role.id)}
               emptyMessage="No roles found. Add your first custom role by clicking 'Add Custom Role'."
             />
           </CardContent>

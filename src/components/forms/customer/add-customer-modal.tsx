@@ -1,26 +1,12 @@
-'use client';
 
-import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import useCustomerService from '@/lib/sales/customer-service';
+import React, { useState } from 'react';
 import { Customer } from '@/types/sales';
+import { Button } from '@/components/ui/button';
+import { createCustomer } from '@/lib/sales/customer-service';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import toast from 'react-hot-toast';
-
-// Schema for customer form
-const customerFormSchema = z.object({
-  name: z.string().min(1, 'Customer name is required'),
-  company: z.string().optional(),
-  email: z.string().email('Valid email is required').optional().or(z.literal('')),
-  billing_address: z.string().optional(),
-  initial_balance: z.number().min(0, 'Initial balance must be a positive number').default(0),
-});
-
-type CustomerFormData = z.infer<typeof customerFormSchema>;
 
 interface AddCustomerModalProps {
   isOpen: boolean;
@@ -28,162 +14,151 @@ interface AddCustomerModalProps {
   onCustomerAdded: (customer: Customer) => void;
 }
 
-export const AddCustomerModal: React.FC<AddCustomerModalProps> = ({
-  isOpen,
-  onClose,
-  onCustomerAdded
-}) => {
-  const { createCustomer } = useCustomerService();
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  
-  const { 
-    control, 
-    handleSubmit, 
-    reset,
-    formState: { errors }
-  } = useForm<CustomerFormData>({
-    resolver: zodResolver(customerFormSchema),
-    defaultValues: {
-      name: '',
-      company: '',
-      email: '',
-      billing_address: '',
-      initial_balance: 0,
-    }
+export default function AddCustomerModal({ isOpen, onClose, onCustomerAdded }: AddCustomerModalProps) {
+  const [formData, setFormData] = useState<Customer>({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    company: '',
+    billing_address: '',
   });
-  
-  // Reset form when modal opens
-  React.useEffect(() => {
-    if (isOpen) {
-      reset();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error when field is edited
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
-  }, [isOpen, reset]);
-  
-  const onSubmit = async (data: CustomerFormData) => {
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.name) {
+      newErrors.name = 'Customer name is required';
+    }
+    
+    // Email validation (optional field)
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
     setIsSubmitting(true);
+    
     try {
+      // Create customer
       const newCustomer = await createCustomer({
-        name: data.name,
-        company: data.company || null,
-        email: data.email || null,
-        billing_address: data.billing_address || null,
-        initial_balance: data.initial_balance,
-        company_id: 0, // This will be set by the backend based on the current user's company
+        name: formData.name,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        company: formData.company || null,
+        billing_address: formData.billing_address || null,
       });
       
-      if (newCustomer) {
-        onCustomerAdded(newCustomer);
-        onClose();
-      }
-    } catch (error) {
-      console.error('Error creating customer:', error);
+      toast.success('Customer added successfully');
+      onCustomerAdded(newCustomer);
+      onClose();
+    } catch (error: any) {
+      console.error('Error adding customer:', error);
+      toast.error(error.message || 'Failed to add customer');
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Add New Customer</DialogTitle>
+          <DialogTitle>Add New Customer</DialogTitle>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-          <Controller
+
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <Input
+            id="name"
             name="name"
-            control={control}
-            render={({ field }) => (
-              <Input
-                label="Customer Name"
-                error={errors.name?.message}
-                required
-                {...field}
-              />
-            )}
+            label="Customer Name"
+            placeholder="Enter customer name"
+            value={formData.name}
+            onChange={handleChange}
+            error={errors.name}
+            required
           />
           
-          <Controller
-            name="company"
-            control={control}
-            render={({ field }) => (
-              <Input
-                label="Company Name"
-                error={errors.company?.message}
-                {...field}
-              />
-            )}
-          />
-          
-          <Controller
+          <Input
+            id="email"
             name="email"
-            control={control}
-            render={({ field }) => (
-              <Input
-                type="email"
-                label="Email"
-                error={errors.email?.message}
-                {...field}
-              />
-            )}
+            label="Email Address"
+            type="email"
+            placeholder="customer@example.com"
+            value={formData.email || ''}
+            onChange={handleChange}
+            error={errors.email}
           />
           
-          <Controller
+          <Input
+            id="phone"
+            name="phone"
+            label="Phone Number"
+            placeholder="Phone number"
+            value={formData.phone || ''}
+            onChange={handleChange}
+          />
+          
+          <Input
+            id="company"
+            name="company"
+            label="Company Name (Optional)"
+            placeholder="Company name"
+            value={formData.company || ''}
+            onChange={handleChange}
+          />
+          
+          <Textarea
+            id="address"
+            name="address"
+            label="Address"
+            placeholder="Enter address"
+            value={formData.address || ''}
+            onChange={handleChange}
+          />
+          
+          <Textarea
+            id="billing_address"
             name="billing_address"
-            control={control}
-            render={({ field }) => (
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Billing Address
-                </label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                  {...field}
-                />
-                {errors.billing_address && (
-                  <p className="text-xs text-red-500">{errors.billing_address.message}</p>
-                )}
-              </div>
-            )}
+            label="Billing Address (if different)"
+            placeholder="Enter billing address"
+            value={formData.billing_address || ''}
+            onChange={handleChange}
           />
-          
-          <Controller
-            name="initial_balance"
-            control={control}
-            render={({ field: { onChange, value, ...rest } }) => (
-              <Input
-                type="number"
-                label="Initial Balance"
-                error={errors.initial_balance?.message}
-                value={value.toString()}
-                onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-                {...rest}
-              />
-            )}
-          />
-          
-          <DialogFooter className="mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              isLoading={isSubmitting}
-              loadingText="Creating..."
-            >
-              Create Customer
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding...' : 'Add Customer'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
-};
-
-export default AddCustomerModal;
+}

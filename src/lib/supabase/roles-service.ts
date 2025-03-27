@@ -1,139 +1,54 @@
 
 import { supabase } from '@/lib/supabase/client';
 import { Role, Permission } from '@/types/auth';
+import { ensureString } from '@/lib/utils';
 
+// Fetch all roles
 export const fetchRoles = async (): Promise<Role[]> => {
   try {
     const { data, error } = await supabase
       .from('roles')
-      .select(`
-        *,
-        permissions:permissions(
-          id,
-          role_id,
-          module_id,
-          can_view,
-          can_create,
-          can_edit,
-          can_delete,
-          created_at,
-          updated_at,
-          module:module_id(id, name)
-        )
-      `)
+      .select('*')
       .order('name');
-    
+
     if (error) {
       throw error;
     }
-    
-    // Transform data to match our Role type
-    return data.map(role => ({
-      id: role.id,
-      name: role.name,
-      description: role.description,
-      is_predefined: role.is_predefined,
-      created_at: role.created_at,
-      updated_at: role.updated_at,
-      permissions: role.permissions ? role.permissions.map(perm => ({
-        id: perm.id,
-        role_id: perm.role_id,
-        module: perm.module?.name || '',
-        can_view: perm.can_view,
-        can_create: perm.can_create,
-        can_edit: perm.can_edit,
-        can_delete: perm.can_delete,
-        created_at: perm.created_at,
-        updated_at: perm.updated_at,
-      })) : [],
-    }));
+
+    return data || [];
   } catch (error) {
     console.error('Error fetching roles:', error);
     throw error;
   }
 };
 
+// Fetch modules for permissions
 export const fetchModules = async () => {
   try {
     const { data, error } = await supabase
       .from('modules')
       .select('*')
       .order('name');
-    
+
     if (error) {
       throw error;
     }
-    
-    return data;
+
+    return data || [];
   } catch (error) {
     console.error('Error fetching modules:', error);
     throw error;
   }
 };
 
-export const fetchRoleById = async (roleId: string): Promise<Role | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('roles')
-      .select(`
-        *,
-        permissions:permissions(
-          id,
-          role_id,
-          module_id,
-          can_view,
-          can_create,
-          can_edit,
-          can_delete,
-          created_at,
-          updated_at,
-          module:module_id(id, name)
-        )
-      `)
-      .eq('id', roleId)
-      .single();
-    
-    if (error) {
-      throw error;
-    }
-    
-    if (!data) {
-      return null;
-    }
-    
-    // Transform data to match our Role type
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      is_predefined: data.is_predefined,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-      permissions: data.permissions ? data.permissions.map(perm => ({
-        id: perm.id,
-        role_id: perm.role_id,
-        module: perm.module?.name || '',
-        can_view: perm.can_view,
-        can_create: perm.can_create,
-        can_edit: perm.can_edit,
-        can_delete: perm.can_delete,
-        created_at: perm.created_at,
-        updated_at: perm.updated_at,
-      })) : [],
-    };
-  } catch (error) {
-    console.error('Error fetching role by ID:', error);
-    throw error;
-  }
-};
-
+// Create a new role with permissions
 export const createRole = async (
   name: string, 
-  description: string | null = null, 
-  permissions: any[] = []
+  description: string | null = null,
+  permissions: { module_id: string; can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean; }[] = []
 ): Promise<Role> => {
   try {
-    // Insert the role
+    // Create the role first
     const { data: roleData, error: roleError } = await supabase
       .from('roles')
       .insert({
@@ -143,76 +58,158 @@ export const createRole = async (
       })
       .select()
       .single();
-    
+
     if (roleError) {
       throw roleError;
     }
-    
-    // If permissions are provided, insert them
-    if (permissions && permissions.length > 0) {
-      // Fetch modules to get module IDs
-      const { data: modules, error: modulesError } = await supabase
-        .from('modules')
-        .select('id, name');
-      
-      if (modulesError) {
-        throw modulesError;
-      }
-      
-      // Create a map of module names to IDs
-      const moduleMap = new Map();
-      modules.forEach(module => {
-        moduleMap.set(module.name, module.id);
-      });
-      
-      // Prepare permissions for insertion
-      const permissionsToInsert = permissions.map(perm => ({
+
+    // If we have permissions, create them
+    if (permissions.length > 0) {
+      const permissionInserts = permissions.map(perm => ({
         role_id: roleData.id,
-        module_id: moduleMap.get(perm.module) || perm.module_id,
+        module_id: perm.module_id,
         can_view: perm.can_view,
         can_create: perm.can_create,
         can_edit: perm.can_edit,
         can_delete: perm.can_delete,
       }));
-      
-      // Insert permissions
-      const { error: permissionsError } = await supabase
+
+      const { error: permError } = await supabase
         .from('permissions')
-        .insert(permissionsToInsert);
-      
-      if (permissionsError) {
-        throw permissionsError;
+        .insert(permissionInserts);
+
+      if (permError) {
+        throw permError;
       }
     }
-    
-    // Fetch the complete role with permissions
-    return await fetchRoleById(roleData.id) as Role;
+
+    return roleData;
   } catch (error) {
     console.error('Error creating role:', error);
     throw error;
   }
 };
 
-export const updateRole = async (
-  roleId: string, 
-  updates: Partial<Role>
-): Promise<Role> => {
+// Fetch a role by ID with its permissions
+export const fetchRoleById = async (roleId: string): Promise<Role | null> => {
   try {
-    // Update the role
-    const { error: roleError } = await supabase
-      .from('roles')
-      .update({
-        name: updates.name,
-        description: updates.description,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', roleId);
+    if (!roleId) {
+      throw new Error('Role ID is required');
+    }
     
+    // Fetch the role
+    const { data: roleData, error: roleError } = await supabase
+      .from('roles')
+      .select('*')
+      .eq('id', roleId)
+      .single();
+
     if (roleError) {
       throw roleError;
     }
-    
-    // Fetch the updated role with permissions
+
+    if (!roleData) {
+      return null;
+    }
+
+    // Fetch the permissions for this role
+    const { data: permissionsData, error: permError } = await supabase
+      .from('permissions')
+      .select(`
+        *,
+        module:module_id(id, name)
+      `)
+      .eq('role_id', roleId);
+
+    if (permError) {
+      throw permError;
+    }
+
+    // Format permissions to match the Permission type
+    const formattedPermissions: Permission[] = permissionsData.map(perm => ({
+      id: perm.id,
+      role_id: perm.role_id,
+      module: perm.module.name,
+      module_id: perm.module_id,
+      can_view: perm.can_view,
+      can_create: perm.can_create,
+      can_edit: perm.can_edit,
+      can_delete: perm.can_delete,
+      created_at: perm.created_at,
+      updated_at: perm.updated_at
+    }));
+
+    // Return the role with permissions
+    return {
+      ...roleData,
+      permissions: formattedPermissions
+    };
+  } catch (error) {
+    console.error('Error fetching role by ID:', error);
+    throw error;
+  }
+};
+
+// Update a role and its permissions
+export const updateRole = async (
+  roleId: string, 
+  name: string, 
+  description: string | null = null,
+  permissions: { module_id: string; can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean; }[] = []
+): Promise<Role> => {
+  if (!roleId) {
+    throw new Error('Role ID is required');
+  }
+  
+  try {
+    // Start a transaction
+    const { data: role, error: roleError } = await supabase
+      .from('roles')
+      .update({
+        name,
+        description,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', roleId)
+      .select()
+      .single();
+
+    if (roleError) {
+      throw roleError;
+    }
+
+    // Delete existing permissions
+    const { error: deleteError } = await supabase
+      .from('permissions')
+      .delete()
+      .eq('role_id', roleId);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    // Insert new permissions
+    if (permissions.length > 0) {
+      // Map each permission to include role_id
+      const permissionsWithRoleId = permissions.map(perm => ({
+        role_id: roleId,
+        module_id: perm.module_id,
+        can_view: perm.can_view,
+        can_create: perm.can_create,
+        can_edit: perm.can_edit,
+        can_delete: perm.can_delete
+      }));
+
+      const { error: insertError } = await supabase
+        .from('permissions')
+        .insert(permissionsWithRoleId);
+
+      if (insertError) {
+        throw insertError;
+      }
+    }
+
+    // Fetch updated role with permissions
     return await fetchRoleById(roleId) as Role;
   } catch (error) {
     console.error('Error updating role:', error);
@@ -220,76 +217,98 @@ export const updateRole = async (
   }
 };
 
-export const deleteRole = async (roleId: string): Promise<void> => {
+// Check if a user has a specific permission
+export const checkPermission = async (userId: string, module: string, action: 'view' | 'create' | 'edit' | 'delete'): Promise<boolean> => {
+  if (!userId || !module || !action) {
+    return false;
+  }
+  
   try {
-    const { error } = await supabase
-      .from('roles')
-      .delete()
-      .eq('id', roleId);
-    
-    if (error) {
-      throw error;
+    // First get the user's role
+    const { data: userData, error: userError } = await supabase
+      .from('employees')
+      .select('role_id, is_admin')
+      .eq('user_id', userId)
+      .single();
+
+    if (userError) {
+      throw userError;
     }
+
+    // Admins have all permissions
+    if (userData?.is_admin) {
+      return true;
+    }
+
+    // No role assigned
+    if (!userData?.role_id) {
+      return false;
+    }
+
+    // Get the module ID
+    const { data: moduleData, error: moduleError } = await supabase
+      .from('modules')
+      .select('id')
+      .eq('name', module)
+      .single();
+
+    if (moduleError) {
+      throw moduleError;
+    }
+
+    // Check permission
+    const actionField = `can_${action}`;
+    const { data: permData, error: permError } = await supabase
+      .from('permissions')
+      .select(actionField)
+      .eq('role_id', userData.role_id)
+      .eq('module_id', moduleData.id)
+      .single();
+
+    if (permError) {
+      return false; // No permission found
+    }
+
+    return !!permData[actionField];
   } catch (error) {
-    console.error('Error deleting role:', error);
-    throw error;
+    console.error('Error checking permission:', error);
+    return false;
   }
 };
 
-export const updateRolePermission = async (
-  roleId: string,
-  moduleId: string,
-  action: 'can_view' | 'can_create' | 'can_edit' | 'can_delete',
-  value: boolean
-): Promise<void> => {
+// Delete a role
+export const deleteRole = async (roleId: string): Promise<void> => {
+  if (!roleId) {
+    throw new Error('Role ID is required');
+  }
+  
   try {
-    // Check if permission already exists
-    const { data: existingPermission, error: checkError } = await supabase
-      .from('permissions')
-      .select('id')
-      .eq('role_id', roleId)
-      .eq('module_id', moduleId)
+    // Check if this is a predefined role
+    const { data: roleData, error: roleCheckError } = await supabase
+      .from('roles')
+      .select('is_predefined')
+      .eq('id', roleId)
       .single();
-    
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is the error code for no rows returned
-      throw checkError;
+
+    if (roleCheckError) {
+      throw roleCheckError;
     }
-    
-    if (existingPermission) {
-      // Update existing permission
-      const update: Record<string, boolean> = {};
-      update[action] = value;
-      
-      const { error: updateError } = await supabase
-        .from('permissions')
-        .update(update)
-        .eq('id', existingPermission.id);
-      
-      if (updateError) {
-        throw updateError;
-      }
-    } else {
-      // Create new permission
-      const newPermission: Record<string, any> = {
-        role_id: roleId,
-        module_id: moduleId,
-        can_view: false,
-        can_create: false,
-        can_edit: false,
-        can_delete: false,
-      };
-      newPermission[action] = value;
-      
-      const { error: insertError } = await supabase
-        .from('permissions')
-        .insert([newPermission]);
-      
-      if (insertError) {
-        throw insertError;
-      }
+
+    if (roleData.is_predefined) {
+      throw new Error('Cannot delete predefined roles');
+    }
+
+    // Delete the role (permissions will be automatically deleted due to CASCADE)
+    const { error: deleteError } = await supabase
+      .from('roles')
+      .delete()
+      .eq('id', roleId);
+
+    if (deleteError) {
+      throw deleteError;
     }
   } catch (error) {
-    console.error('Error updating role permission:', error);
+    console.error('Error deleting role:', error);
     throw error;
   }
 };

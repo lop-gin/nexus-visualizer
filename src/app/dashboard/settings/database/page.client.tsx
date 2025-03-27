@@ -1,44 +1,63 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/common/layout/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import enhancedToast from '@/lib/toast-utils';
-import { executeSQLMigration } from '@/lib/supabase/migrations';
+import { executeSQLMigration, checkDatabaseStatus } from '@/lib/supabase/migrations';
+import toast from 'react-hot-toast';
 
 export default function DatabaseSettingsPage() {
-  const [sql, setSql] = React.useState('');
-  const [result, setResult] = React.useState<any>(null);
-  const [isExecuting, setIsExecuting] = React.useState(false);
+  const [sqlQuery, setSqlQuery] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [dbStatus, setDbStatus] = useState({ success: true, message: 'Checking database status...' });
+  const [queryResult, setQueryResult] = useState<any>(null);
+
+  // Check database status on component mount
+  React.useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const status = await checkDatabaseStatus();
+        setDbStatus(status);
+      } catch (error) {
+        setDbStatus({ success: false, message: 'Failed to check database status' });
+      }
+    };
+
+    checkStatus();
+  }, []);
 
   const handleExecuteSQL = async () => {
-    if (!sql.trim()) {
-      enhancedToast.error('Please enter SQL to execute');
+    if (!sqlQuery.trim()) {
+      toast.error('Please enter a SQL query to execute');
       return;
     }
 
     setIsExecuting(true);
-    setResult(null);
+    setQueryResult(null);
     
     try {
-      const response = await executeSQLMigration(sql);
-      setResult(response);
+      const result = await executeSQLMigration(sqlQuery);
       
-      if (response.success) {
-        enhancedToast.info('SQL executed successfully');
+      if (result.success) {
+        toast.success('SQL executed successfully');
+        setQueryResult({ success: true, message: 'Query executed successfully' });
       } else {
-        enhancedToast.error(response.error || 'Failed to execute SQL');
+        toast.error(result.error || 'Failed to execute SQL');
+        setQueryResult({ success: false, error: result.error });
       }
     } catch (error: any) {
-      console.error('Error executing SQL:', error);
-      setResult({ success: false, error: error.message });
-      enhancedToast.error(error.message || 'Failed to execute SQL');
+      toast.error(error.message || 'Failed to execute SQL');
+      setQueryResult({ success: false, error: error.message });
     } finally {
       setIsExecuting(false);
     }
+  };
+
+  const handleSqlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setSqlQuery(e.target.value);
   };
 
   return (
@@ -50,43 +69,43 @@ export default function DatabaseSettingsPage() {
         
         <Card>
           <CardHeader>
-            <CardTitle>SQL Console</CardTitle>
+            <CardTitle>Database Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`p-4 rounded-md ${dbStatus.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+              {dbStatus.message}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Execute SQL</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Enter SQL Query</label>
-              <Textarea
-                value={sql}
-                onChange={(e) => setSql(e.target.value)}
-                placeholder="SELECT * FROM your_table"
-                className="h-32 font-mono"
-              />
-            </div>
+            <Textarea 
+              label="SQL Query"
+              rows={10}
+              value={sqlQuery}
+              onChange={handleSqlChange}
+              placeholder="Enter SQL query to execute..."
+            />
             
-            <div className="flex justify-end">
-              <Button
-                onClick={handleExecuteSQL}
-                isLoading={isExecuting}
-                loadingText="Executing..."
-              >
-                Execute SQL
-              </Button>
-            </div>
+            <Button 
+              onClick={handleExecuteSQL}
+              disabled={isExecuting}
+              className="w-full"
+            >
+              {isExecuting ? 'Executing...' : 'Execute SQL'}
+            </Button>
             
-            {result && (
-              <div className="mt-4 border rounded-md p-4">
-                <h3 className="text-lg font-medium mb-2">Result</h3>
-                <pre className="bg-gray-50 p-4 rounded-md overflow-auto max-h-96 text-sm">
-                  {JSON.stringify(result, null, 2)}
-                </pre>
+            {queryResult && (
+              <div className={`p-4 rounded-md mt-4 ${queryResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                {queryResult.success 
+                  ? queryResult.message 
+                  : `Error: ${queryResult.error}`}
               </div>
             )}
-            
-            <div className="mt-4 p-4 bg-yellow-50 rounded-md border border-yellow-200">
-              <p className="text-yellow-800 text-sm">
-                <strong>Warning:</strong> Be careful when executing SQL queries. Changes made to your database are permanent. Make sure to back up your data before making significant changes.
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>

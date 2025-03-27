@@ -1,6 +1,13 @@
 
 import { supabase } from '@/lib/supabase/client';
 import { Employee } from '@/types/auth';
+import { isValidStatus, ensureString } from '@/lib/utils';
+
+// Helper to ensure employee status is valid
+function validateEmployeeStatus(status: string | null | undefined): "active" | "inactive" | "invited" {
+  if (!status) return "invited";
+  return isValidStatus(status) ? status : "invited";
+}
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
   try {
@@ -26,8 +33,8 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
       company_id: emp.company_id,
       role_id: emp.role_id,
       role: emp.role,
-      is_admin: emp.is_admin,
-      status: emp.status as "active" | "inactive" | "invited",
+      is_admin: emp.is_admin || false,
+      status: validateEmployeeStatus(emp.status),
       created_at: emp.created_at,
       updated_at: emp.updated_at,
       user_id: emp.user_id,
@@ -68,8 +75,8 @@ export const fetchEmployeeById = async (employeeId: string): Promise<Employee | 
       company_id: data.company_id,
       role_id: data.role_id,
       role: data.role,
-      is_admin: data.is_admin,
-      status: data.status as "active" | "inactive" | "invited",
+      is_admin: data.is_admin || false,
+      status: validateEmployeeStatus(data.status),
       created_at: data.created_at,
       updated_at: data.updated_at,
       user_id: data.user_id,
@@ -83,6 +90,11 @@ export const fetchEmployeeById = async (employeeId: string): Promise<Employee | 
 
 export const createEmployee = async (employeeData: Omit<Employee, 'id' | 'created_at' | 'updated_at'>, sendInvite: boolean = false): Promise<Employee> => {
   try {
+    // Ensure we have a valid company_id
+    if (!employeeData.company_id) {
+      throw new Error('Company ID is required');
+    }
+    
     const { data, error } = await supabase
       .from('employees')
       .insert({
@@ -90,10 +102,10 @@ export const createEmployee = async (employeeData: Omit<Employee, 'id' | 'create
         email: employeeData.email,
         phone: employeeData.phone,
         address: employeeData.address,
-        company_id: employeeData.company_id || '',
-        role_id: employeeData.role_id,
-        is_admin: employeeData.is_admin,
-        status: 'invited',
+        company_id: employeeData.company_id,
+        role_id: employeeData.role_id || null,
+        is_admin: employeeData.is_admin || false,
+        status: validateEmployeeStatus(employeeData.status),
         invitation_sent: sendInvite,
       })
       .select()
@@ -112,8 +124,8 @@ export const createEmployee = async (employeeData: Omit<Employee, 'id' | 'create
       address: data.address,
       company_id: data.company_id,
       role_id: data.role_id,
-      is_admin: data.is_admin,
-      status: data.status as "active" | "inactive" | "invited",
+      is_admin: data.is_admin || false,
+      status: validateEmployeeStatus(data.status),
       created_at: data.created_at,
       updated_at: data.updated_at,
       user_id: data.user_id,
@@ -166,7 +178,7 @@ export const updateEmployee = async (
       company_id: data.company_id,
       role_id: data.role_id,
       is_admin: data.is_admin,
-      status: data.status as "active" | "inactive" | "invited",
+      status: validateEmployeeStatus(data.status),
       created_at: data.created_at,
       updated_at: data.updated_at,
       user_id: data.user_id,
@@ -212,7 +224,7 @@ export const sendEmployeeInvitation = async (employeeId: string): Promise<Employ
       employee.email, 
       employee.phone, 
       employee.role_id || '', 
-      employee.is_admin
+      employee.is_admin || false
     );
     
     // Set invitation_sent to true

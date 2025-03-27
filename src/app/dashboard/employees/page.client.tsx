@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -11,6 +12,7 @@ import { Database } from '@/types/supabase';
 import { Employee } from '@/types/auth';
 import { PlusCircle, Edit, Trash2, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { isValidStatus, ensureString } from '@/lib/utils';
 
 export default function EmployeesPage() {
   const router = useRouter();
@@ -37,7 +39,25 @@ export default function EmployeesPage() {
           throw error;
         }
         
-        setEmployees(data || []);
+        // Transform and validate the data
+        const validEmployees = (data || []).map(emp => ({
+          id: emp.id,
+          full_name: emp.full_name,
+          email: emp.email,
+          phone: emp.phone,
+          address: emp.address,
+          company_id: emp.company_id,
+          role_id: emp.role_id,
+          role: emp.role,
+          is_admin: emp.is_admin || false,
+          status: isValidStatus(emp.status) ? emp.status : 'invited',
+          created_at: emp.created_at,
+          updated_at: emp.updated_at,
+          user_id: emp.user_id,
+          invitation_sent: emp.invitation_sent || false,
+        }));
+        
+        setEmployees(validEmployees);
       } catch (error: any) {
         console.error('Error fetching employees:', error);
         toast.error('Failed to load employees');
@@ -54,10 +74,14 @@ export default function EmployeesPage() {
   };
 
   const handleEditEmployee = (employeeId: string) => {
-    router.push(`/dashboard/employees/${employeeId}`);
+    if (employeeId) {
+      router.push(`/dashboard/employees/${employeeId}`);
+    }
   };
 
   const handleDeleteEmployee = async (employeeId: string, employeeName: string) => {
+    if (!employeeId) return;
+    
     if (confirm(`Are you sure you want to delete ${employeeName}? This action cannot be undone.`)) {
       setIsDeleting(employeeId);
       try {
@@ -83,6 +107,8 @@ export default function EmployeesPage() {
   };
 
   const handleSendInvite = async (employeeId: string, employeeEmail: string) => {
+    if (!employeeId) return;
+    
     setIsSendingInvite(employeeId);
     try {
       // Call API to send invitation
@@ -109,18 +135,19 @@ export default function EmployeesPage() {
     }
   };
 
+  // Define columns with type-safe accessors
   const columns = [
     {
       header: 'Name',
-      accessor: 'full_name',
+      accessor: (employee: Employee) => employee.full_name
     },
     {
       header: 'Email',
-      accessor: 'email',
+      accessor: (employee: Employee) => employee.email
     },
     {
       header: 'Phone',
-      accessor: 'phone',
+      accessor: (employee: Employee) => employee.phone || 'Not provided',
       className: 'hidden md:table-cell',
     },
     {
@@ -154,7 +181,9 @@ export default function EmployeesPage() {
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              handleEditEmployee(employee.id);
+              if (employee.id) {
+                handleEditEmployee(employee.id);
+              }
             }}
           >
             <Edit className="h-4 w-4" />
@@ -168,7 +197,9 @@ export default function EmployeesPage() {
               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
               onClick={(e) => {
                 e.stopPropagation();
-                handleSendInvite(employee.id, employee.email);
+                if (employee.id) {
+                  handleSendInvite(employee.id, employee.email);
+                }
               }}
               disabled={isSendingInvite === employee.id}
             >
@@ -190,7 +221,9 @@ export default function EmployeesPage() {
             className="text-red-600 hover:text-red-700 hover:bg-red-50"
             onClick={(e) => {
               e.stopPropagation();
-              handleDeleteEmployee(employee.id, employee.full_name);
+              if (employee.id) {
+                handleDeleteEmployee(employee.id, employee.full_name);
+              }
             }}
             disabled={isDeleting === employee.id}
           >
@@ -216,8 +249,8 @@ export default function EmployeesPage() {
           <h1 className="text-2xl font-semibold text-gray-800">Employee Management</h1>
           <Button 
             onClick={handleAddEmployee}
-            leftIcon={<PlusCircle className="h-4 w-4 mr-2" />}
           >
+            <PlusCircle className="h-4 w-4 mr-2" />
             Add Employee
           </Button>
         </div>
@@ -231,7 +264,7 @@ export default function EmployeesPage() {
               data={employees}
               columns={columns}
               isLoading={isLoading}
-              onRowClick={(employee) => handleEditEmployee(employee.id)}
+              onRowClick={(employee) => employee.id && handleEditEmployee(employee.id)}
               emptyMessage="No employees found. Add your first employee by clicking 'Add Employee'."
             />
           </CardContent>

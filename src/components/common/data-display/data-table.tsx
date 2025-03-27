@@ -1,109 +1,76 @@
 
 import React from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-interface DataTableProps<T extends Record<string, any>> {
+interface Column<T> {
+  header: string;
+  accessor: keyof T | ((row: T) => React.ReactNode);
+  className?: string;
+}
+
+interface DataTableProps<T> {
   data: T[];
-  columns: {
-    header: string;
-    accessor: keyof T | string | ((row: T) => React.ReactNode);
-    className?: string;
-  }[];
+  columns: Column<T>[];
   isLoading?: boolean;
   onRowClick?: (row: T) => void;
   emptyMessage?: string;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T>({
   data,
   columns,
   isLoading = false,
   onRowClick,
-  emptyMessage = "No data available"
+  emptyMessage = 'No data available'
 }: DataTableProps<T>) {
-  
-  const renderCell = (row: T, accessor: typeof columns[number]['accessor']) => {
-    if (typeof accessor === 'function') {
-      return accessor(row);
-    }
-    
-    // Handle string path accessors (e.g., 'user.name')
-    if (typeof accessor === 'string' && accessor.includes('.')) {
-      const keys = accessor.split('.');
-      let value: any = row;
-      for (const key of keys) {
-        value = value?.[key];
-      }
-      return value;
-    }
-    
-    // Simple accessor
-    return row[accessor as keyof T];
-  };
-  
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center p-8">
-        <div className="flex flex-col items-center">
-          <svg
-            className="animate-spin h-8 w-8 text-blue-600 mb-4"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <p className="text-gray-600">Loading data...</p>
+      <div className="min-h-32 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <div className="animate-spin h-5 w-5 border-2 border-indigo-500 rounded-full border-t-transparent"></div>
+          <span className="text-sm text-gray-500">Loading...</span>
         </div>
       </div>
     );
   }
-  
-  if (!data.length) {
+
+  if (data.length === 0) {
     return (
-      <div className="text-center p-8 text-gray-500">
-        {emptyMessage}
+      <div className="min-h-32 flex items-center justify-center">
+        <p className="text-sm text-gray-500">{emptyMessage}</p>
       </div>
     );
   }
-  
+
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
-            {columns.map((column, i) => (
-              <TableHead
-                key={i}
-                className={column.className}
-              >
+            {columns.map((column, index) => (
+              <TableHead key={index} className={column.className}>
                 {column.header}
               </TableHead>
             ))}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((row, i) => (
+          {data.map((row, rowIndex) => (
             <TableRow
-              key={i}
-              onClick={() => onRowClick?.(row)}
-              className={onRowClick ? "cursor-pointer hover:bg-gray-50" : ""}
+              key={rowIndex}
+              onClick={() => onRowClick && onRowClick(row)}
+              className={onRowClick ? 'cursor-pointer hover:bg-gray-100' : ''}
             >
-              {columns.map((column, j) => (
-                <TableCell key={j} className={column.className}>
-                  {renderCell(row, column.accessor)}
+              {columns.map((column, colIndex) => (
+                <TableCell key={colIndex} className={column.className}>
+                  {renderCellContent(row, column.accessor)}
                 </TableCell>
               ))}
             </TableRow>
@@ -112,4 +79,23 @@ export function DataTable<T extends Record<string, any>>({
       </Table>
     </div>
   );
+}
+
+// Helper function to render cell content based on accessor type
+function renderCellContent<T>(row: T, accessor: keyof T | ((row: T) => React.ReactNode)) {
+  if (typeof accessor === 'function') {
+    return accessor(row);
+  }
+  
+  const value = row[accessor];
+  
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  
+  if (React.isValidElement(value)) {
+    return value;
+  }
+  
+  return String(value);
 }

@@ -1,6 +1,91 @@
+import { supabase } from '@/lib/supabase/client';
 
-import { supabase } from './client';
-import { createRolesTable, createModulesTable, createPermissionsTable, createEmployeesTable, createCompaniesTable, createInvitationsTable, insertPredefinedRoles } from './schema';
+// Interface for migration results
+interface MigrationResult {
+  success: boolean;
+  message?: string;
+  error?: any;
+}
+
+// Function to execute SQL migration
+export const executeSQLMigration = async (sqlScript: string): Promise<MigrationResult> => {
+  try {
+    const { data, error } = await supabase.rpc('exec_sql', {
+      sql_query: sqlScript
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+
+    return {
+      success: true,
+      message: 'SQL migration executed successfully'
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'An error occurred during migration'
+    };
+  }
+};
+
+// Function to check database status
+export const checkDatabaseStatus = async (): Promise<MigrationResult> => {
+  try {
+    const { data, error } = await supabase
+      .from('migrations')
+      .select('*')
+      .limit(1);
+    
+    if (error) {
+      // If the table doesn't exist, it might need initialization
+      if (error.code === '42P01') { // Table does not exist
+        return {
+          success: false,
+          message: 'Database needs initialization'
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+    
+    return {
+      success: true,
+      message: 'Database connection successful'
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to check database status'
+    };
+  }
+};
+
+// Function to apply schema migrations from a file
+export const applyMigrationFromFile = async (filePath: string): Promise<MigrationResult> => {
+  try {
+    // Fetch the SQL file
+    const response = await fetch(filePath);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch migration file: ${response.statusText}`);
+    }
+    
+    const sqlScript = await response.text();
+    return await executeSQLMigration(sqlScript);
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to apply migration'
+    };
+  }
+};
 
 // Function to create roles table and insert predefined roles
 export const createRoles = async () => {
