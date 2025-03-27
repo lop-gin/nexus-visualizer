@@ -1,69 +1,66 @@
-# Welcome to your Lovable project
+# Janus Project - README
 
-## Project info
+## Overview
 
-**URL**: https://lovable.dev/projects/aca27ea4-9cb5-447e-8f12-14dce61dca71
+Janus is a QuickBooks-like system designed specifically for manufacturers and distributors. It provides comprehensive functionality for managing customers, products, sales, employees, and roles with a focus on manufacturing-specific needs.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **Role-Based Access Control**: Comprehensive permission system with predefined and custom roles
+- **Employee Management**: Add, invite, and manage employees with different roles
+- **Customer Management**: Track customers with "Add New" feature in dropdowns
+- **Product Management**: Manage products with primary and secondary units of measure and conversion factors
+- **Sales Management**: Create and manage invoices, sales receipts, and other transactions
+- **Multi-Tenant Architecture**: Secure data isolation between different companies
+- **Supabase Integration**: Works with both hosted and self-hosted Supabase instances
 
-**Use Lovable**
+## Getting Started
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/aca27ea4-9cb5-447e-8f12-14dce61dca71) and start prompting.
+### Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js 18+ and npm
+- Supabase account (or self-hosted Supabase instance)
 
-**Use your preferred IDE**
+### Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/janus_project.git
+   cd janus_project/next-frontend-refactored
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-Follow these steps:
+3. Set up environment variables:
+   Create a `.env.local` file with the following variables:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+5. Initialize the database:
+   Navigate to `/dashboard/settings/database` after logging in as an admin to run the database migrations.
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Documentation
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+For detailed information about the project, please refer to:
 
-**Edit a file directly in GitHub**
+- [User Documentation](./DOCUMENTATION.md) - Comprehensive guide for users and administrators
+- [Developer Guide](./DEVELOPER_GUIDE.md) - Technical documentation for developers
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## License
 
-**Use GitHub Codespaces**
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Acknowledgments
 
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/aca27ea4-9cb5-447e-8f12-14dce61dca71) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+- Built with Next.js and Supabase
+- Inspired by QuickBooks but tailored for manufacturing and distribution needs
